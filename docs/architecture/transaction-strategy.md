@@ -171,3 +171,4 @@ public ActivationResult activateDevice(UUID licenseId, String fingerprint, Strin
   }
   ```
   If another administrator modified the license simultaneously, an `OptimisticLockingFailureException` is thrown and handled cleanly by `GlobalExceptionHandler`.
+

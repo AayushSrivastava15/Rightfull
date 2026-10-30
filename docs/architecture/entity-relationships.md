@@ -360,3 +360,4 @@ Rightful adheres to high-performance, strictly isolated JPA conventions across a
 ### 3.5 DTO Separation Boundary
 - **Architectural Invariant**: JPA `@Entity` classes must never be returned from REST controllers or accepted as request parameters.
 - Feature modules declare typed, validated Request/Response DTOs (`LicenseResponse`, `CreateLicenseRequest`) with explicit mapping mappers to ensure zero internal entity leakage.
+
