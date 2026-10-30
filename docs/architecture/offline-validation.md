@@ -1,71 +1,106 @@
-# Rightful – Offline Validation & Heartbeat Lifecycle
+# Rightful – Offline Validation & Heartbeat Lifecycle Specification (Step 3.3)
 
-## 1. Hybrid Validation Philosophy
+## 1. Architectural Philosophy
 
-Modern software runs in diverse network environments: remote fieldwork, flights, flaky office networks, or secure air-gapped zones. Software licensing must be resilient against transient network failures while preventing indefinite unauthorized usage.
+Rightful recognizes that modern client applications (desktop software, developer CLI utilities, field agents, on-premise appliances) operate in varying network conditions. Applications must remain responsive during temporary network disruptions while strictly preventing unauthorized long-term software execution.
 
-Rightful enforces a **Hybrid Online/Offline Validation Model**:
-- **Connected (Online) State**: Validation heartbeats occur every **5 minutes**.
-- **Offline / Disconnected State**: Client enters a default **7-hour offline grace period**.
-- **Configurability**: The grace period is customizable per product or license plan tier (e.g. 7 hours for standard tiers, 72 hours for enterprise air-gapped field workers).
+To balance developer user experience with vendor revenue protection, Rightful enforces a **Hybrid Online/Offline Validation Model**:
+1. **Online Heartbeat**: Validated client applications submit a lightweight heartbeat every **5 minutes**.
+2. **Offline Grace Window**: When network communication fails, the application falls back to a **7-hour offline grace period**.
+3. **Grace Origin**: Grace duration is measured strictly from the `last_validated_at` timestamp signed by the server.
+4. **Enforcement**: Once the grace period expires, access to protected application functionality is blocked immediately until a successful validation heartbeat reconnects with Rightful.
 
 ---
 
-## 2. Heartbeat & Grace Period State Machine
+## 2. Validation State Machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Unlicensed
+    [*] --> Unlicensed : Application Launch
     
-    Unlicensed --> OnlineValid : Activate License (Online)
+    Unlicensed --> OnlineValid : Initial Activation (Online POST /api/v1/validation/activate)
     
     state OnlineValid {
-        [*] --> HeartbeatScheduled
-        HeartbeatScheduled --> SendHeartbeat : 5-minute timer triggers
-        SendHeartbeat --> HeartbeatScheduled : 200 OK (Entitlement Refreshed)
+        [*] --> TimerRunning
+        TimerRunning --> SendHeartbeat : 5-minute interval reached
+        SendHeartbeat --> TimerRunning : 200 OK (Signed Entitlement Refreshed)
     }
 
-    OnlineValid --> OfflineGrace : Network Request Fails (Offline)
+    OnlineValid --> OfflineGrace : Heartbeat Fails (Network Timeout / Offline)
     
     state OfflineGrace {
-        [*] --> CheckGraceRemaining
-        CheckGraceRemaining --> WithinGrace : Elapsed < GracePeriod (7 hours)
-        WithinGrace --> AppRunningInGrace : Allow Execution
-        WithinGrace --> RetryOnlineSync : Background retry every 1 min
+        [*] --> CheckElapsed
+        CheckElapsed --> AllowedWithinGrace : CurrentTime - LastValidatedAt < GracePeriod (7h)
+        AllowedWithinGrace --> RetryHeartbeat : Background retry every 60s
+        RetryHeartbeat --> AllowedWithinGrace : Still Offline
     }
 
-    OfflineGrace --> OnlineValid : Network Restored & Heartbeat Succeeds
-    OfflineGrace --> ExpiredLocked : Elapsed >= GracePeriod (7 hours)
+    OfflineGrace --> OnlineValid : Network Restored (Heartbeat Succeeds)
+    OfflineGrace --> GraceExpired : CurrentTime - LastValidatedAt >= GracePeriod (7h)
     
-    state ExpiredLocked {
-        [*] --> ExecutionBlocked
-        ExecutionBlocked --> OnlineValid : Reconnect & Validate
+    state GraceExpired {
+        [*] --> SoftLockout
+        SoftLockout --> HardLockout : Execution of protected features blocked
     }
 
-    OnlineValid --> Revoked : Server reports Revocation/Suspension
-    OfflineGrace --> Revoked : Server reports Revocation/Suspension
+    GraceExpired --> OnlineValid : Network Restored & Re-validated
+    
+    OnlineValid --> Revoked : Server returns 403 (License Revoked / Suspended)
+    OfflineGrace --> Revoked : Server returns 403 upon reconnect
     Revoked --> [*]
 ```
 
 ---
 
-## 3. Mathematical Formula for Grace Evaluation
+## 3. Database Schema Supporting Offline Validation
 
-When evaluating license validity locally, the client SDK calculates:
+The following columns across the database schema directly support offline grace tracking and validation telemetry:
 
-$$\text{CurrentTime} - \text{LastValidatedAt} \le \text{GracePeriodSeconds}$$
-
-- **Default Parameters**:
-  - `OnlineValidationInterval`: $300\text{ seconds } (5\text{ minutes})$
-  - `DefaultGracePeriod`: $25,200\text{ seconds } (7\text{ hours})$
-  - `LastValidatedAt`: Server-signed UTC Unix timestamp embedded in the Ed25519 entitlement token.
+| Table | Column Name | Type | Purpose in Offline Validation |
+| :--- | :--- | :--- | :--- |
+| `product_settings`| `default_grace_period_hours` | `INTEGER` | Product-wide fallback grace duration (Default: `7`). |
+| `product_settings`| `validation_interval_minutes`| `INTEGER` | Product-wide heartbeat interval (Default: `5`). |
+| `license_plans` | `offline_grace_period_hours` | `INTEGER` | Plan-level grace duration override (e.g. `72` for enterprise). |
+| `license_plans` | `validation_interval_minutes`| `INTEGER` | Plan-level heartbeat interval override. |
+| `licenses` | `last_validated_at` | `TIMESTAMPTZ`| Last timestamp server certified entitlement validity. |
+| `licenses` | `offline_grace_period_hours`| `INTEGER` | Per-license specific grace duration override. |
+| `device_activations`| `last_heartbeat_at` | `TIMESTAMPTZ`| Device-specific timestamp of last received heartbeat. |
+| `activation_events`| `occurred_at` | `TIMESTAMPTZ`| Audit log timestamp of heartbeat attempt. |
 
 ---
 
-## 4. Anti-Tampering & Clock Skew Mitigation
+## 4. Client-Side Evaluation Algorithm & Contract
 
-To prevent end-users from extending grace periods by rolling back system clocks:
-1. **Monotonic Clocks**: Client SDKs measure elapsed time using OS monotonic timers (e.g., `clock_gettime(CLOCK_MONOTONIC)` in POSIX, `System.nanoTime()` in Java, `performance.now()` in Web/Electron, `QueryPerformanceCounter` on Windows).
-2. **Encrypted Local Heartbeat State**: The SDK writes a signed local state cache recording the maximum observed timestamp. If `SystemTime < LastRecordedTime`, clock rollback is detected and the application immediately enters restricted mode.
-3. **Server-Signed Expiration Bounds**: The entitlement token's `iat` and `exp` are certified by the server's Ed25519 signature; modifying the token invalidates the cryptographic signature.
+When an application starts or runs a protected feature:
 
+1. **Check Local Entitlement**:
+   - The application reads its cached signed entitlement token (JWS).
+   - Verifies the cryptographic signature using the embedded product **Ed25519 public key**.
+   - If signature verification fails, the token is rejected immediately.
+2. **Evaluate Expiration & Grace Duration**:
+   $$\Delta t = t_{\text{current}} - t_{\text{last\_validated}}$$
+   - If $\Delta t < \text{grace\_period\_seconds}$ (default $25,200\text{ seconds}$ / $7\text{ hours}$):
+     - The application continues executing normally in **Offline Grace Mode**.
+     - A background task attempts to reconnect to `/api/v1/validation/heartbeat` every 60 seconds.
+   - If $\Delta t \ge \text{grace\_period\_seconds}$:
+     - The application transitions to **Grace Expired (Locked)**.
+     - Protected business logic throws a licensing exception and prompts the user to connect to the internet.
+
+---
+
+## 5. Anti-Clock-Tampering Strategies
+
+End-users may attempt to extend offline grace indefinitely by setting system clocks backwards. Rightful client SDKs employ three complementary defenses:
+
+1. **OS Monotonic Clock Integration**:
+   - SDKs measure elapsed time using hardware monotonic timers that cannot be manipulated by user-space date/time adjustments:
+     - Linux/Android: `clock_gettime(CLOCK_MONOTONIC_RAW)`
+     - macOS/iOS: `mach_continuous_time()`
+     - Windows: `QueryPerformanceCounter()`
+     - JVM / Java: `System.nanoTime()`
+     - Web / Electron: `performance.now()`
+2. **Encrypted High-Water Mark Local Cache**:
+   - The SDK periodically writes a signed, encrypted state record storing the maximum observed UTC timestamp $t_{\text{max}}$.
+   - If $t_{\text{current}} < t_{\text{max}} - 60\text{ seconds}$ (clock skew threshold), the SDK detects backward clock manipulation and immediately suspends grace.
+3. **Signed Server Timestamp Bounds**:
+   - The entitlement token's `iat`, `exp`, and `last_validated_at` are digitally certified by the server's Ed25519 private key; any manual modification invalidates the token signature.

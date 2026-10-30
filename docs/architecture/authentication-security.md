@@ -1,35 +1,40 @@
-# Rightful – Authentication & Security Architecture
+# Rightful – Authentication & Security Architecture (Step 3.3)
 
-## 1. Authentication Strategy
+## 1. Authentication Strategy & Provider Ownership
 
-Rightful deliberately decouples **Authentication (Identity)** from **Authorization (Business Entitlements & Permissions)**:
-- **Authentication Provider**: **Supabase Auth** (Hosted Gotrue service).
-- **Application Authorization**: **Spring Boot (Resource Server)** with internal Workspace Membership and Role-Based Access Control (RBAC).
+Rightful strictly separates **Identity/Authentication** from **Application Authorization**:
+- **Identity Provider (IdP)**: **Supabase Auth** (Hosted Gotrue engine).
+- **Application Authorization**: **Spring Boot (OAuth2 Resource Server)** with multi-tenant Workspace Membership and Role-Based Access Control (RBAC).
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as User / Developer
     participant SPA as Rightful Frontend (React)
-    participant SupaAuth as Supabase Auth Service
+    participant SupaAuth as Supabase Auth (Gotrue)
     participant API as Rightful Backend (Spring Boot)
     participant DB as PostgreSQL Database
 
     User->>SPA: Selects Login (Email, Google, or GitHub)
     SPA->>SupaAuth: Authenticate Credentials / OAuth Callback
-    SupaAuth-->>SPA: Returns Session + Signed JWT (Access Token)
+    SupaAuth-->>SPA: Returns Session + Signed Access Token (JWT)
     
-    User->>SPA: Navigates to Dashboard / Products
-    SPA->>API: HTTP Request + Header `Authorization: Bearer <JWT>`
+    User->>SPA: Accesses Dashboard / API
+    SPA->>API: HTTP Request + `Authorization: Bearer <JWT>`
     
-    Note over API: Spring Security OAuth2 Resource Server Filter
-    API->>SupaAuth: (Cached) Fetch & verify against JWKS endpoint
-    API->>DB: Lookup internal User by `supabase_user_id` (auto-provision on first login)
-    API->>DB: Query Workspace Roles & Permissions
+    Note over API: Spring Security Resource Server Filter
+    API->>SupaAuth: (Cached) Verify Signature via Supabase JWKS
+    
+    Note over API: User Context & JIT Provisioning
+    API->>DB: Lookup User by `supabase_user_id`
+    alt First Time Login (Not Found)
+        API->>DB: Idempotent JIT Provisioning (User + Workspace + Owner Role)
+    end
+    API->>DB: Fetch Workspace Roles & Permissions
     
     alt Authorized
         API-->>SPA: 200 OK + JSON Response
-    else Insufficient Workspace Permissions
+    else Insufficient Workspace Role
         API-->>SPA: 403 Forbidden
     else Invalid / Expired Token
         API-->>SPA: 401 Unauthorized
@@ -38,44 +43,99 @@ sequenceDiagram
 
 ---
 
-## 2. Authentication Methods Supported
+## 2. Authentication Methods & Supabase Features Supported
 
-1. **Email & Password**: Handled directly by Supabase Auth with standard password hashing (Argon2 / bcrypt) and email verification workflows.
-2. **Google OAuth**: One-click social sign-in using Google Cloud OAuth credentials configured in Supabase.
-3. **GitHub OAuth**: Developer-focused social login using GitHub OAuth App credentials.
-
----
-
-## 3. Token Verification in Spring Boot
-
-Spring Boot functions strictly as an **OAuth2 Resource Server** using Spring Security's native JWT support:
-- Spring Boot **does not issue** access tokens or refresh tokens.
-- Tokens are validated statelessly using the Supabase JWKS (JSON Web Key Set) URL:
-  ```
-  ${SUPABASE_URL}/auth/v1/.well-known/jwks.json
-  ```
-- Public keys are fetched over HTTPS, validated, and cached in memory to maintain sub-millisecond request verification.
-- Validated claims extracted by Spring Boot:
-  - `sub`: Unique UUID representing the Supabase user identity.
-  - `email`: Authenticated email address.
-  - `exp`: Token expiration timestamp.
+1. **Email & Password**: Handled entirely by Supabase Gotrue. Passwords are never seen, hashed, or stored by Rightful.
+2. **Google OAuth 2.0**: Turnkey social sign-in via Google Cloud credentials configured in Supabase.
+3. **GitHub OAuth 2.0**: Developer-focused social authentication.
+4. **Email Verification**: Enforced at the Supabase Auth tier before tokens carry `email_confirmed_at`.
+5. **Password Recovery**: Secure, out-of-band magic link password resets managed by Supabase.
+6. **Session & Refresh Management**: Frontend refreshes short-lived access tokens (typically 1 hour) via Supabase Auth client SDK.
 
 ---
 
-## 4. User Provisioning & Identity Synchronization
+## 3. Idempotent First-Login Provisioning Workflow
 
-When a valid JWT reaches the Spring Boot backend:
-1. An authentication filter extracts the `sub` claim.
-2. The `IdentityService` checks if an internal `User` record exists for `supabase_user_id`.
-3. **Just-In-Time (JIT) Provisioning**: If no internal record exists (first visit), Rightful automatically creates the user profile and generates a default personal workspace.
-4. The authenticated principal is populated into Spring Security's `SecurityContextHolder`.
+When an authenticated user invokes the Rightful API for the first time, their profile and primary workspace must be provisioned seamlessly.
+
+### 3.1 Concurrency & Race Condition Challenge
+In modern single-page applications, initial page load often triggers multiple concurrent API requests (e.g. `GET /workspaces`, `GET /user/profile`, `GET /notifications`). Multiple requests with the same new JWT can hit Spring Boot simultaneously.
+
+### 3.2 Idempotent JIT Provisioning Algorithm
+```mermaid
+flowchart TD
+    Req["Incoming API Request with Bearer JWT"] --> Extract["Extract `sub` (supabase_user_id) and `email`"]
+    Extract --> Check["SELECT id FROM users WHERE supabase_user_id = :sub"]
+    
+    Check -->|Exists| ReturnUser["Set SecurityContext with existing User and proceed"]
+    
+    Check -->|Not Found| BeginTx["Begin Transaction (READ COMMITTED)"]
+    BeginTx --> UpsertUser["INSERT INTO users (id, supabase_user_id, email, full_name)<br/>VALUES (gen_random_uuid(), :sub, :email, :name)<br/>ON CONFLICT (supabase_user_id) DO NOTHING"]
+    
+    UpsertUser --> CheckInserted{"Row Inserted?"}
+    
+    CheckInserted -->|Yes| CreateWS["1. INSERT INTO workspaces (name = 'Personal Workspace', owner_id = user.id)<br/>2. INSERT INTO workspace_members (workspace_id, user_id, role = 'OWNER')<br/>3. INSERT INTO user_preferences (user_id, default_workspace_id)"]
+    CreateWS --> CommitTx["Commit Transaction"]
+    
+    CheckInserted -->|No (Concurrent Winner)| FetchWinner["SELECT id FROM users WHERE supabase_user_id = :sub"]
+    FetchWinner --> CommitTx
+    CommitTx --> ReturnUser
+```
+
+### 3.3 Database Constraints Guaranteeing Idempotency
+- `users(supabase_user_id)` has a `UNIQUE` constraint.
+- `workspace_members(workspace_id, user_id)` has a `UNIQUE` composite constraint.
+- `user_preferences(user_id)` has a `UNIQUE` constraint.
 
 ---
 
-## 5. Security Invariants & Boundaries
+## 4. Account Linking & Identity Provider Differences
 
-- **Zero Secret Exposure**: The Supabase service role secret is never sent to the client. The frontend uses only the `SUPABASE_ANON_KEY`.
-- **Stateless Authorization**: All API endpoints require bearer tokens; session state and cookies are avoided on backend endpoints.
-- **CORS Hardening**: Strict Cross-Origin Resource Sharing (CORS) configuration permits only whitelisted frontend origins.
-- **Rate Limiting (Planned)**: Public validation endpoints will enforce IP- and key-based bucket rate limiting to prevent brute-force key guessing.
+- **Supabase Auth Ownership**: When a user logs in with Google and subsequently links GitHub (or logs in with matching verified emails), Supabase Auth associates both identities under the same persistent `auth.users(id)`.
+- **Rightful Immutability**: Rightful keys application records strictly to `supabase_user_id`. When identities are linked in Supabase, the application user ID remains unchanged.
+- **Email Synchronization**: If a user updates their email in Supabase Auth, a background reconciliation hook or token inspection updates `users.email` without modifying surrogate keys.
 
+---
+
+## 5. PostgreSQL Row Level Security (RLS) & Spring Boot Integration
+
+Rightful employs a **defense-in-depth** strategy combining application-level security with database-level Row Level Security.
+
+### 5.1 The Privileged Connection Pool Problem
+- Spring Boot uses HikariCP with connection pooling, connecting to PostgreSQL as a privileged database user (e.g., `postgres` or `rightful_app`).
+- By default in PostgreSQL, superusers and roles with the `BYPASSRLS` attribute bypass all RLS policies.
+
+### 5.2 Architectural Solution: Session-Scoped Context Setting
+1. **Dedicated Database Application Role**: The Spring Boot connection pool authenticates using a dedicated role `rightful_app_role` created with `NOBYPASSRLS`:
+   ```sql
+   CREATE ROLE rightful_app_role WITH LOGIN PASSWORD '...' NOBYPASSRLS;
+   ```
+2. **Context Setting via Connection Interceptor**:
+   When Spring Boot executes a tenant request, the service layer sets session variables before running queries:
+   ```sql
+   SET LOCAL app.current_workspace_id = '9f8e7d6c-5b4a-3210-fedc-ba9876543210';
+   SET LOCAL app.current_user_id = '11223344-5566-7788-99aa-bbccddeeff00';
+   ```
+3. **Database RLS Policy Definition**:
+   ```sql
+   ALTER TABLE licenses ENABLE ROW LEVEL SECURITY;
+   
+   CREATE POLICY workspace_isolation_policy ON licenses
+       FOR ALL
+       TO rightful_app_role
+       USING (workspace_id = NULLIF(current_setting('app.current_workspace_id', true), '')::UUID)
+       WITH CHECK (workspace_id = NULLIF(current_setting('app.current_workspace_id', true), '')::UUID);
+   ```
+
+---
+
+## 6. Security Threat Modeling (STRIDE Analysis)
+
+| Threat Category | Potential Attack Vector | Rightful Mitigation Design |
+| :--- | :--- | :--- |
+| **Spoofing** | Forged JWT access token to masquerade as another user. | Asymmetric signature verification using official Supabase JWKS with short cache TTL and strict `iss`/`aud` validation. |
+| **Tampering** | Modifying offline entitlement tokens or tampering with database license records. | Ed25519 digital signatures on entitlement tokens; HMAC-SHA-256 non-reversible digests stored in database. |
+| **Repudiation** | An admin revoking a license and denying the action. | Immutable `audit_logs` table recording `actor_id`, `actor_type`, IP address, timestamp, and JSON diffs. |
+| **Information Disclosure**| Database breach leaking active software license keys. | Plaintext keys are never stored; only `key_hash` (HMAC-SHA-256) is persisted. Product Ed25519 private keys encrypted with AES-256-GCM. |
+| **Denial of Service** | Flooding `/api/v1/validation/heartbeat` with invalid requests to exhaust database connections. | Fast-fail HMAC lookup, Redis bucket rate limiting per IP and product, and connection pool sizing. |
+| **Elevation of Privilege**| User from Workspace A attempting to read/modify licenses in Workspace B (IDOR). | Dual-layer enforcement: Spring Security `@PreAuthorize("@workspaceSecurity.hasAccess(...)")` + mandatory `workspace_id` JPA predicates + PostgreSQL RLS. |
