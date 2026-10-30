@@ -39,3 +39,4 @@ public class OpenApiConfig {
                                         .description("Supabase Auth Access Token (RS256/ES256 signed JWT)")));
     }
 }
+

@@ -78,3 +78,4 @@ When a valid JWT reaches the Spring Boot backend:
 - **Stateless Authorization**: All API endpoints require bearer tokens; session state and cookies are avoided on backend endpoints.
 - **CORS Hardening**: Strict Cross-Origin Resource Sharing (CORS) configuration permits only whitelisted frontend origins.
 - **Rate Limiting (Planned)**: Public validation endpoints will enforce IP- and key-based bucket rate limiting to prevent brute-force key guessing.
+

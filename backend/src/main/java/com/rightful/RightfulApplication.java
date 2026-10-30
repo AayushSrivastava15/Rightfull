@@ -16,3 +16,4 @@ public class RightfulApplication {
         SpringApplication.run(RightfulApplication.class, args);
     }
 }
+

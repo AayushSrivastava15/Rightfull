@@ -191,3 +191,4 @@ Detailed architectural specifications and design records are maintained in `docs
 - Creation of full Flyway relational migrations for business schemas (`workspaces`, `products`, `plans`, `customers`, `licenses`, `activations`, `audit_logs`).
 - JPA Entity implementations and Spring Data repositories.
 - Method-level workspace security evaluators and Supabase JWKS decoder integration.
+

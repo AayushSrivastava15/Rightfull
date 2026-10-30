@@ -68,3 +68,4 @@ To prevent end-users from extending grace periods by rolling back system clocks:
 1. **Monotonic Clocks**: Client SDKs measure elapsed time using OS monotonic timers (e.g., `clock_gettime(CLOCK_MONOTONIC)` in POSIX, `System.nanoTime()` in Java, `performance.now()` in Web/Electron, `QueryPerformanceCounter` on Windows).
 2. **Encrypted Local Heartbeat State**: The SDK writes a signed local state cache recording the maximum observed timestamp. If `SystemTime < LastRecordedTime`, clock rollback is detected and the application immediately enters restricted mode.
 3. **Server-Signed Expiration Bounds**: The entitlement token's `iat` and `exp` are certified by the server's Ed25519 signature; modifying the token invalidates the cryptographic signature.
+

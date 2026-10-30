@@ -36,3 +36,4 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.data.springBootVersion", notNullValue()));
     }
 }
+

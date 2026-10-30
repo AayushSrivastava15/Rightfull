@@ -15,3 +15,4 @@ services:
 volumes:
   rightful_pgdata:
     driver: local
+

@@ -14,3 +14,4 @@ For local development without an external Supabase instance, you can spin up a l
 cd infrastructure/docker
 docker compose up -d
 ```
+

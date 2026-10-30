@@ -51,3 +51,4 @@ class CryptoUtilsTest {
         assertFalse(CryptoUtils.constantTimeEquals(hash1, diffKeyHash));
     }
 }
+

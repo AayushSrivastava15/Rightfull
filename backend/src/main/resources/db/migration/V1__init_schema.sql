@@ -19,3 +19,4 @@ CREATE TABLE IF NOT EXISTS system_metadata (
 INSERT INTO system_metadata (key, value)
 VALUES ('schema_version', '1.0.0-baseline')
 ON CONFLICT (key) DO NOTHING;
+

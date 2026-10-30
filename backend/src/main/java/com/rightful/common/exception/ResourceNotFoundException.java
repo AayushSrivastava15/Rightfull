@@ -14,3 +14,4 @@ public class ResourceNotFoundException extends BusinessException {
                 HttpStatus.NOT_FOUND);
     }
 }
+

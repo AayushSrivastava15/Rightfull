@@ -161,3 +161,4 @@ erDiagram
 - All DDL statements are maintained under `backend/src/main/resources/db/migration/`.
 - File naming convention follows standard Flyway semantics: `V<Version>__<Description>.sql`.
 - In accordance with milestone boundaries, no business tables are executed initially; `V1__init_schema.sql` establishes the schema baseline.
+

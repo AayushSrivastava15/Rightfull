@@ -61,3 +61,4 @@ public class ErrorDetails {
         this.timestamp = timestamp;
     }
 }
+

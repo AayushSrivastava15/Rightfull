@@ -85,3 +85,4 @@ flowchart LR
 - [ ] Interactive license generation wizard.
 - [ ] Live telemetry inspector and device activation management.
 - [ ] Billing & subscription integration (Stripe / LemonSqueezy) [Proposed].
+

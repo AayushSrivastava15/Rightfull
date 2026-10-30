@@ -10,3 +10,4 @@ export function useHealth() {
     staleTime: 30000,
   })
 }
+

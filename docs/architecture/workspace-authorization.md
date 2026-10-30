@@ -61,3 +61,4 @@ public ApiResponse<LicenseResponse> createLicense(...) { ... }
 1. Every repository query filtering tenant-owned entities enforces `where workspace.id = :workspaceId`.
 2. Hibernate filters and JPA Specifications automatically append workspace predicates to avoid manual query omission errors.
 3. Access attempts referencing a `workspaceId` where the caller has no membership result in an immediate `403 Forbidden` or `404 Not Found` (to prevent workspace enumeration).
+

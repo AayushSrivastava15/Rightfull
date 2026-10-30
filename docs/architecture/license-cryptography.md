@@ -103,3 +103,4 @@ flowchart TD
 }
 ```
 Client SDKs inspect `last_validated_at` and `grace_period_seconds` to allow offline work up to the deadline.
+

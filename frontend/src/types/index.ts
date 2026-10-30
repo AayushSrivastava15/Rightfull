@@ -95,3 +95,4 @@ export interface SystemHealth {
   springBootVersion?: string
   timestamp: string
 }
+

@@ -77,3 +77,4 @@ Rightful exposes a production-grade RESTful API designed with predictable conven
 - `POST /api/v1/validation/activate` – Register and lock a new device seat.
 - `POST /api/v1/validation/deactivate` – Deactivate a device seat.
 - `POST /api/v1/validation/heartbeat` – 5-minute recurring heartbeat keeping entitlement active.
+

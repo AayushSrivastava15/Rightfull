@@ -40,3 +40,4 @@ public class HealthController {
         return ApiResponse.ok(healthData, "Rightful platform backend is operational");
     }
 }
+

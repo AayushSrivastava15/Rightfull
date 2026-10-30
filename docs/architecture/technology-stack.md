@@ -46,3 +46,4 @@ Rightful is structured as a modern monorepo combining a high-performance React T
 ### 3.3 Authentication: Supabase Auth + Spring Boot Resource Server
 - **Decision**: Offload authentication to Supabase Auth while maintaining application authorization inside Spring Boot.
 - **Justification**: Supabase Auth provides turnkey support for social providers (Google, GitHub) and email/password with secure session refreshes. Spring Boot verifies tokens via Supabase JWKS asynchronously and maps the `sub` claim to internal user profiles and workspace roles.
+

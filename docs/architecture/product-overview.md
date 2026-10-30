@@ -52,3 +52,4 @@ Rightful bridges the gap between complex proprietary licensing infrastructure (e
 - **Modular Monolith**: Package-by-feature backend architecture, ensuring clean boundaries between modules while avoiding distributed systems overhead.
 - **Zero Credential Exposure**: Supabase Auth handles identity and token issuance; Spring Boot acts as an OAuth2 Resource Server validating JWTs via JWKS without storing user passwords.
 - **Open Standards**: Ed25519 signatures, HMAC-SHA-256 key hashing, OpenAPI 3.1 specifications, and PostgreSQL ACID guarantees.
+

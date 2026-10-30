@@ -70,3 +70,4 @@ com.rightful.<module>/
 4. **Proposed vs Confirmed Modules**:
    - **Confirmed**: `security`, `common`, `identity`, `workspace`, `product`, `plan`, `customer`, `licensing`, `activation`, `validation`, `audit`, `integration`, `notification`.
    - **Proposed**: `billing` (will be integrated with Stripe / LemonSqueezy in a subsequent milestone).
+

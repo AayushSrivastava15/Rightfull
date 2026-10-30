@@ -13,3 +13,4 @@ class RightfulApplicationTests {
         // Confirms Spring Boot application context bootstraps cleanly on Java 25
     }
 }
+

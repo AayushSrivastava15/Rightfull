@@ -88,3 +88,4 @@ flowchart TB
 - **Connection Pooling**: HikariCP maintains optimized connection pools to Supabase PostgreSQL with statement caching.
 - **Caching & JWKS Resiliency**: Remote JWKS public keys are cached in memory with automatic rotation fallback, avoiding per-request external HTTP calls.
 - **Fail-Closed Licensing**: If an entitlement cannot be verified and the grace period has elapsed, the client SDK fails securely according to configured plan rules.
+

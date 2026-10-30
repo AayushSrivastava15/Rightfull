@@ -10,3 +10,4 @@ describe('Rightful Frontend Application', () => {
     expect(screen.getByText('Modular Monolith')).toBeInTheDocument()
   })
 })
+
