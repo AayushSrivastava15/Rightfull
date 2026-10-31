@@ -10,6 +10,17 @@
 !frontend/.env.example
 !backend/.env.example
 
+# Spring Boot application properties and configuration files
+application*.properties
+application-*.properties
+**/application*.properties
+**/application-*.properties
+application*.yml
+application*.yaml
+**/application*.yml
+**/application*.yaml
+!**/application*.properties.example
+
 # Operating System files
 .DS_Store
 Thumbs.db

@@ -5,12 +5,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class HealthControllerTest {
 
@@ -18,19 +20,17 @@ class HealthControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new HealthController()).build();
+        HealthController controller = new HealthController();
+        ReflectionTestUtils.setField(controller, "applicationName", "rightfull-backend");
+        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
     @Test
-    @DisplayName("GET /api/v1/health should return UP status and platform metadata")
-    void healthEndpointShouldReturnOkAndMetadata() throws Exception {
+    @DisplayName("GET /api/v1/health should return HTTP 200 with status UP and application name")
+    void healthEndpointShouldReturnUpAndApplicationName() throws Exception {
         mockMvc.perform(get("/api/v1/health").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success", is(true)))
-                .andExpect(jsonPath("$.data.status", is("UP")))
-                .andExpect(jsonPath("$.data.product", is("Rightfull")))
-                .andExpect(jsonPath("$.data.version", is("0.0.1")))
-                .andExpect(jsonPath("$.data.javaVersion", notNullValue()))
-                .andExpect(jsonPath("$.data.springBootVersion", notNullValue()));
+                .andExpect(jsonPath("$.status", is("UP")))
+                .andExpect(jsonPath("$.application", is("rightfull-backend")));
     }
 }

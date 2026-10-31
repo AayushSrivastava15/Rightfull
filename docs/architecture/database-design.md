@@ -33,7 +33,7 @@ Rightful is an open-source, multi-tenant SaaS software licensing platform design
 | 11 | licenses              | License Core Lifecycle  | Scoped to Workspace  | id (UUID)          |
 | 12 | license_entitlements  | License Overrides       | Scoped to Workspace  | id (UUID)          |
 | 13 | license_key_hashes    | Cryptographic Storage   | Scoped to Workspace  | id (UUID)          |
-| 14 | device_activations    | Node-Locking & Seats    | Scoped to Workspace  | id (UUID)          |
+| 14 | activations           | Node-Locking & Seats    | Scoped to Workspace  | id (UUID)          |
 | 15 | activation_events     | Heartbeat Audit Trail   | Scoped to Workspace  | id (UUID)          |
 | 16 | orders                | Commerce & Purchasing   | Scoped to Workspace  | id (UUID)          |
 | 17 | payments              | Transactions & Gateways | Scoped to Workspace  | id (UUID)          |
@@ -333,7 +333,7 @@ Cryptographic lookup store holding HMAC-SHA-256 digests. Plaintext keys are neve
 
 ---
 
-### 3.14 Domain 14: `device_activations`
+### 3.14 Domain 14: `activations`
 Active node locks linking a license seat to an authorized device hardware fingerprint.
 
 | Column Name | PostgreSQL Data Type | Constraints | Nullable | Default | Description |
@@ -351,7 +351,7 @@ Active node locks linking a license seat to an authorized device hardware finger
 
 - **Constraints & Indexes**:
   - Unique Constraint: `CONSTRAINT uk_license_device UNIQUE (license_id, device_fingerprint)`
-  - `idx_device_activations_license_status`: `CREATE INDEX idx_device_activations_license_status ON device_activations(license_id, status);`
+  - `idx_activations_license_status`: `CREATE INDEX idx_activations_license_status ON activations(license_id, status);`
 
 ---
 
@@ -362,7 +362,7 @@ Immutable telemetry tracking heartbeats, activation attempts, and seat rejection
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | `id` | `UUID` | PK | No | `gen_random_uuid()` | Event identifier. |
 | `license_id` | `UUID` | FK | No | None | References `licenses(id) ON DELETE CASCADE`. |
-| `activation_id` | `UUID` | FK | Yes | `NULL` | References `device_activations(id) ON DELETE SET NULL`. |
+| `activation_id` | `UUID` | FK | Yes | `NULL` | References `activations(id) ON DELETE SET NULL`. |
 | `workspace_id` | `UUID` | FK | No | None | References `workspaces(id) ON DELETE CASCADE`. |
 | `event_type` | `VARCHAR(32)` | - | No | None | `ACTIVATION`, `HEARTBEAT`, `DEACTIVATION`, `SEAT_EXCEEDED`, `REJECTED`. |
 | `ip_address` | `INET` | - | Yes | `NULL` | Remote client IP. |
@@ -531,3 +531,30 @@ Immutable compliance and security audit logs tracking every administrative actio
 1. **Mandatory Tenant Foreign Keys**: All tables 4–22 enforce `workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE`.
 2. **Composite Indexes for Tenant Isolation**: Whenever queries filter on tenant-owned entities (e.g., licenses by status, orders by customer), the composite index begins with `workspace_id` (e.g. `(workspace_id, status)`).
 3. **Partitioning Readiness**: High-velocity time-series tables (`activation_events`, `audit_logs`, `webhook_events`) are structured to support future PostgreSQL native declarative range partitioning on `occurred_at` / `created_at` by month without altering application queries.
+
+---
+
+## 5. Migration History & Versioned Flyway Baseline
+
+Rightfull uses Flyway for reproducible, sequential database schema evolutions. Spring Data JPA / Hibernate is permanently configured with `ddl-auto=none`.
+
+### 5.1 Applied Migrations
+
+| Migration Script | Description | Tables Implemented | Applied Date | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| `V1__init_core_schema.sql` | Core Identity & Multi-Tenant Workspace Schema | `users`, `workspaces`, `user_preferences`, `workspace_members` | 2026-10-30 | **Applied & Verified** |
+| `V2__workspace_invitations.sql` | Workspace Invitations Schema | `workspace_invitations` | 2026-10-31 | **Prepared & Verified** |
+
+### 5.2 Step 3.6 Core Schema Scope (V1)
+In accordance with Step 3.6 architectural directives:
+- Exactly 4 foundational tables are created:
+  1. `users`: Global identity linked to Supabase Auth (`supabase_user_id UUID UNIQUE`).
+  2. `workspaces`: Multi-tenant organization boundaries (`slug` format checked, tier and status constrained).
+  3. `user_preferences`: 1:1 user settings with fallback workspace references (`ON DELETE SET NULL`).
+  4. `workspace_members`: RBAC memberships (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`) with `(workspace_id, user_id)` uniqueness.
+- **Step 3.8 Additions (V2)**:
+  5. `workspace_invitations`: Team member invitations with SHA-256 token hashes, role constraints, single-use acceptance, and default-deny RLS.
+- **Intentionally Deferred Tables (6–22)**:
+  `products`, `product_settings`, `license_plans`, `plan_entitlements`, `customers`, `licenses`, `license_entitlements`, `license_key_hashes`, `activations`, `activation_events`, `orders`, `payments`, `subscriptions`, `api_keys`, `webhooks`, `webhook_events`, `audit_logs`.
+- **Row Level Security (RLS)**: Default-deny RLS is enabled on all tables (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`) with zero permissive public policies, shielding the schema from unauthorized PostgREST/client queries. The application connects via the Supabase Session Pooler with role `postgres` (`BYPASSRLS`), enforcing tenant boundaries at the Spring Boot application level.
+

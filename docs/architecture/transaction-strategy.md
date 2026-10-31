@@ -75,7 +75,7 @@ sequenceDiagram
     Note over DB: Thread B BLOCKED waiting for Thread A lock release
     
     Note over Svc: Thread A checks: used_seats (0) < max_seats (1) -> OK
-    Svc->>DB: INSERT INTO device_activations (license_id, fingerprint, status = 'ACTIVE')
+    Svc->>DB: INSERT INTO activations (license_id, fingerprint, status = 'ACTIVE')
     Svc->>DB: UPDATE licenses SET used_seats = used_seats + 1 WHERE id = :id
     Svc->>DB: COMMIT Transaction (Thread A)
     Note over DB: Thread A releases lock. Dev A receives 200 OK + Signed Entitlement

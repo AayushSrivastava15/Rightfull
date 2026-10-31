@@ -18,7 +18,7 @@ flowchart TD
         Plans["license_plans & entitlements"]
         Customers["customers"]
         Licenses["licenses & key_hashes"]
-        Activations["device_activations"]
+        Activations["activations"]
         Orders["orders & payments"]
         DevOps["api_keys & webhooks"]
         Audit["audit_logs"]
@@ -135,3 +135,96 @@ public ApiResponse<ProductResponse> rotateKeys(...) { ... }
 
 - **[PROPOSED] Organization / Team Sub-Workspaces**: Support for nested sub-workspaces for large software vendors with separate departmental units. (Deferred to Milestone 8).
 - **[PROPOSED] Granular Custom Roles**: Allowing enterprise vendors to define customized role definitions (e.g. `SUPPORT_TIER_1` vs `SUPPORT_TIER_2`). (Deferred to Milestone 8).
+
+---
+
+## 6. Step 3.7 Implementation Reference: WorkspaceSecurityEvaluator
+
+### 6.1 Evaluator Architecture
+Implemented in [`WorkspaceSecurityEvaluator.java`](file:///d:/RIGHTFUL.com/backend/src/main/java/com/rightfull/workspace/security/WorkspaceSecurityEvaluator.java) as `@Component("workspaceSecurity")`:
+- Resolves authenticated user from SecurityContext JWT `sub` claim.
+- Looks up user membership in `workspace_members`.
+- Enforces role hierarchy: `OWNER` (level 4) > `ADMIN` (level 3) > `MEMBER` (level 2) > `VIEWER` (level 1).
+- Rejects requests from non-members with HTTP 403 Forbidden.
+- Rejects role escalation attempts (e.g. MEMBER attempting ADMIN actions) with HTTP 403 Forbidden.
+
+### 6.2 Protected Workspace Endpoints
+Implemented in [`WorkspaceController.java`](file:///d:/RIGHTFUL.com/backend/src/main/java/com/rightfull/workspace/controller/WorkspaceController.java):
+- `GET /api/v1/workspaces/{workspaceId}`: Requires `VIEWER` role.
+- `PUT /api/v1/workspaces/{workspaceId}`: Requires `ADMIN` role.
+- `DELETE /api/v1/workspaces/{workspaceId}`: Requires `OWNER` role.
+- `GET /api/v1/users/me`: Authenticated profile endpoint returning user identity, default workspace, and all active workspace memberships with their assigned roles.
+
+---
+
+## 7. Step 3.8 Implementation Reference: Workspace Management & Authorization Foundation
+
+### 7.1 Workspace Lifecycle
+Workspaces transition through states (`ACTIVE`, `SUSPENDED`, `ARCHIVED`):
+1. **Creation**: `POST /api/v1/workspaces`. Authenticated user is automatically provisioned as `OWNER`. Unique slug is validated or generated. Automatically assigned as default workspace in `user_preferences` if none exists.
+2. **Retrieval**: `GET /api/v1/workspaces` (list memberships for user) and `GET /api/v1/workspaces/{workspaceId}` (details for members with at least `VIEWER`).
+3. **Settings Update**: `PATCH` / `PUT /api/v1/workspaces/{workspaceId}`. Restricted to `ADMIN` or `OWNER`.
+4. **Archiving**: `POST /api/v1/workspaces/{workspaceId}/archive`. Restricted strictly to `OWNER`.
+5. **Ownership Transfer**: `POST /api/v1/workspaces/{workspaceId}/transfer-ownership`. Restricted strictly to current `OWNER`. The target must be an existing active member. Current owner is demoted to `ADMIN`, and target is promoted to `OWNER`.
+6. **Deletion**: `DELETE /api/v1/workspaces/{workspaceId}`. Restricted strictly to `OWNER`.
+
+### 7.2 Membership Lifecycle & Role Hierarchy
+- **Listing & Details**: `GET /api/v1/workspaces/{workspaceId}/members` and `GET /api/v1/workspaces/{workspaceId}/members/{memberId}` accessible to any active member (`VIEWER+`).
+- **Role Modification**: `PATCH /api/v1/workspaces/{workspaceId}/members/{memberId}` restricted to `ADMIN` or `OWNER`.
+  - Anti-escalation rule: `ADMIN` cannot modify peer `ADMIN` or `OWNER`.
+  - Anti-escalation rule: `ADMIN` cannot promote another member to `ADMIN` (only `OWNER` can promote to `ADMIN`).
+  - Target role cannot be set to `OWNER` via this endpoint (must use `transfer-ownership`).
+  - Cannot change the role of the workspace `OWNER`.
+- **Member Removal / Leave**: `DELETE /api/v1/workspaces/{workspaceId}/members/{memberId}`.
+  - Last OWNER protection: Cannot delete or leave if user is the last `OWNER` of the workspace.
+  - `ADMIN` cannot remove peer `ADMIN` or `OWNER`.
+  - `OWNER` can remove any member (except last owner condition).
+  - Voluntarily leaving is permitted for non-owners or when multiple owners exist.
+  - Clears `default_workspace_id` in `user_preferences` if the removed workspace was the user's default.
+
+### 7.3 Invitation Lifecycle & Cryptographic Token Security
+1. **Creation**: `POST /api/v1/workspaces/{workspaceId}/invitations` (ADMIN+).
+   - Generates 32-byte cryptographically secure random token (64 hex characters).
+   - Computes SHA-256 hash and stores `token_hash` in `workspace_invitations`. Raw token is never stored in DB.
+   - Raw token is returned exactly once in the creation response and emailed via `EmailService`.
+   - Expiration set to 7 days.
+   - Prevents duplicate active pending invitations for the same email.
+   - Prohibits issuing invitations with `OWNER` role.
+2. **List & Revocation**: `GET /api/v1/workspaces/{workspaceId}/invitations` and `DELETE /api/v1/workspaces/{workspaceId}/invitations/{invitationId}` (ADMIN+).
+3. **Acceptance**: `POST /api/v1/invitations/{token}/accept`.
+   - Hashes incoming raw token with SHA-256 and retrieves invitation.
+   - Validates status is `PENDING` and invitation has not expired.
+   - Enforces email binding: Authenticated user's email must match `invitation.email` (HTTP 403 `EMAIL_MISMATCH` on failure).
+   - Creates `WorkspaceMember` record with specified role and marks invitation `ACCEPTED`.
+4. **Rejection**: `POST /api/v1/invitations/{token}/reject`.
+   - Marks invitation `REJECTED`. Single-use enforcement prevents subsequent redemptions.
+
+### 7.4 Default Workspace Management
+- `GET /api/v1/users/me/default-workspace`: Retrieves user's active default workspace. If membership is no longer active (e.g. removed), clears the stale reference.
+- `POST /api/v1/users/me/default-workspace`: Sets default workspace. Validates that the authenticated user holds an active membership in the selected workspace (preventing cross-tenant unauthorized selection).
+
+### 7.5 Audit Logging Abstraction
+Security-sensitive workspace operations dispatch structured audit records via `WorkspaceAuditService`:
+- `WORKSPACE_CREATED`
+- `WORKSPACE_UPDATED`
+- `WORKSPACE_ARCHIVED`
+- `WORKSPACE_OWNERSHIP_TRANSFERRED`
+- `MEMBER_INVITED`
+- `INVITATION_ACCEPTED`
+- `INVITATION_REJECTED`
+- `INVITATION_REVOKED`
+- `MEMBER_ROLE_CHANGED`
+- `MEMBER_REMOVED`
+- `DEFAULT_WORKSPACE_CHANGED`
+
+### 7.6 Multi-Tenant Security Limitations & Production Considerations
+> [!IMPORTANT]
+> The backend connects to Supabase PostgreSQL using the administrative `postgres` user via the Session Pooler.
+> The `postgres` role has PostgreSQL superuser/`BYPASSRLS` privileges, which bypasses RLS policies on query execution.
+> Therefore, tenant boundary enforcement relies on the application layer:
+> 1. Spring Security method authorization (`@workspaceSecurity.hasRole`).
+> 2. Service-level membership and role verification.
+> 3. Verified Supabase JWT principal extraction (never trusting client-supplied user IDs).
+> Before production launch, an application database user with least privileges and transaction-scoped `SET LOCAL app.current_workspace_id = ?` must be provisioned.
+
+

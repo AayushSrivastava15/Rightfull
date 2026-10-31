@@ -98,6 +98,31 @@ public final class CryptoUtils {
                 b.getBytes(StandardCharsets.UTF_8)
         );
     }
+
+    /**
+     * Calculates SHA-256 digest of input string as lowercase hex.
+     */
+    public static String sha256Hex(String data) {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null");
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(data.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    /**
+     * Generates a cryptographically secure random token as lowercase hex string.
+     */
+    public static String generateSecureToken(int byteLength) {
+        byte[] randomBytes = new byte[byteLength];
+        new SecureRandom().nextBytes(randomBytes);
+        return HexFormat.of().formatHex(randomBytes);
+    }
 }
 
 

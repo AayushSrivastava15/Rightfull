@@ -37,11 +37,11 @@ erDiagram
 
     LICENSES ||--|| LICENSE_KEY_HASHES : authenticates
     LICENSES ||--o{ LICENSE_ENTITLEMENTS : overrides
-    LICENSES ||--o{ DEVICE_ACTIVATIONS : locks
+    LICENSES ||--o{ ACTIVATIONS : locks
     LICENSES ||--o{ ACTIVATION_EVENTS : logs
     LICENSES ||--o| SUBSCRIPTIONS : backs
 
-    DEVICE_ACTIVATIONS ||--o{ ACTIVATION_EVENTS : triggers
+    ACTIVATIONS ||--o{ ACTIVATION_EVENTS : triggers
 
     ORDERS ||--o{ PAYMENTS : settles
 
@@ -178,7 +178,7 @@ erDiagram
         bigint numeric_value
     }
 
-    DEVICE_ACTIVATIONS {
+    ACTIVATIONS {
         uuid id PK
         uuid license_id FK
         uuid workspace_id FK
@@ -295,9 +295,9 @@ erDiagram
 | `customers` | `licenses` | `customer_id` | 1 : N | Customer is the legal holder of the license. | `RESTRICT` |
 | `licenses` | `license_key_hashes` | `license_id` | 1 : 1 | Non-reversible HMAC digest for validation lookup. | `CASCADE` |
 | `licenses` | `license_entitlements`| `license_id` | 1 : N | Per-license customized feature overrides. | `CASCADE` |
-| `licenses` | `device_activations` | `license_id` | 1 : N | Node-locked hardware activations bound to license. | `CASCADE` |
+| `licenses` | `activations` | `license_id` | 1 : N | Node-locked hardware activations bound to license. | `CASCADE` |
 | `licenses` | `activation_events` | `license_id` | 1 : N | Validation heartbeat and activation telemetry. | `CASCADE` |
-| `device_activations` | `activation_events` | `activation_id` | 1 : N | Telemetry events linked to specific device. | `SET NULL` |
+| `activations` | `activation_events` | `activation_id` | 1 : N | Telemetry events linked to specific device. | `SET NULL` |
 | `customers` | `orders` | `customer_id` | 1 : N | Commercial orders placed by customer. | `RESTRICT` |
 | `orders` | `payments` | `order_id` | 1 : N | Payment transaction executions for an order. | `CASCADE` |
 | `customers` | `subscriptions` | `customer_id` | 1 : N | Recurring billing subscriptions. | `RESTRICT` |
@@ -360,4 +360,27 @@ Rightful adheres to high-performance, strictly isolated JPA conventions across a
 ### 3.5 DTO Separation Boundary
 - **Architectural Invariant**: JPA `@Entity` classes must never be returned from REST controllers or accepted as request parameters.
 - Feature modules declare typed, validated Request/Response DTOs (`LicenseResponse`, `CreateLicenseRequest`) with explicit mapping mappers to ensure zero internal entity leakage.
+
+---
+
+## 4. Implementation Phasing & Migration Status
+
+### 4.1 Phase 1 (Step 3.6 - Active in PostgreSQL): Core Identity & Workspaces
+The following 4 foundational entities are fully migrated and live in the database via `V1__init_core_schema.sql`:
+1. `users` (Identity Root)
+2. `user_preferences` (User Settings)
+3. `workspaces` (Tenant Root)
+4. `workspace_members` (RBAC Join)
+
+### 4.2 Phase 2 (Step 3.8 - Active in Migration Schema): Workspace Invitations
+Added in `V2__workspace_invitations.sql`:
+5. `workspace_invitations` (Team Collaboration & Single-Use Hashed Tokens)
+
+### 4.3 Phase 3+ (Deferred Domain Entities):
+The remaining 17 tables defined in this document are strictly deferred to subsequent feature implementation steps:
+- Software Catalog & Configuration: `products`, `product_settings`, `license_plans`, `plan_entitlements`
+- Licensing & Device Activations: `customers`, `licenses`, `license_entitlements`, `license_key_hashes`, `activations`, `activation_events`
+- Commerce & Subscriptions: `orders`, `payments`, `subscriptions`
+- Integrations & Auditing: `api_keys`, `webhooks`, `webhook_events`, `audit_logs`
+
 

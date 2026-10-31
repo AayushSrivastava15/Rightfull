@@ -139,3 +139,45 @@ Rightful employs a **defense-in-depth** strategy combining application-level sec
 | **Information Disclosure**| Database breach leaking active software license keys. | Plaintext keys are never stored; only `key_hash` (HMAC-SHA-256) is persisted. Product Ed25519 private keys encrypted with AES-256-GCM. |
 | **Denial of Service** | Flooding `/api/v1/validation/heartbeat` with invalid requests to exhaust database connections. | Fast-fail HMAC lookup, Redis bucket rate limiting per IP and product, and connection pool sizing. |
 | **Elevation of Privilege**| User from Workspace A attempting to read/modify licenses in Workspace B (IDOR). | Dual-layer enforcement: Spring Security `@PreAuthorize("@workspaceSecurity.hasAccess(...)")` + mandatory `workspace_id` JPA predicates + PostgreSQL RLS. |
+
+---
+
+## 7. Step 3.7 Implementation Reference: Supabase Auth & JWT Verification
+
+### 7.1 Verified Supabase JWKS & Algorithm Configuration
+- **Supabase Project Reference**: `kcyccddrzsfxgrkeenop`
+- **JWKS Endpoint**: `https://kcyccddrzsfxgrkeenop.supabase.co/auth/v1/.well-known/jwks.json`
+- **Signing Algorithm**: Asymmetric `ES256` (Elliptic Curve NIST P-256 / secp256r1) with key rotation support. Fallback `RS256` also enabled in `NimbusJwtDecoder`.
+- **Issuer (`iss`)**: `https://kcyccddrzsfxgrkeenop.supabase.co/auth/v1`
+- **Audience (`aud`)**: `authenticated`
+- **Subject (`sub`)**: Verified Supabase User UUID.
+
+### 7.2 Backend Spring Security Configuration
+Implemented in [`SecurityConfig.java`](file:///d:/RIGHTFUL.com/backend/src/main/java/com/rightfull/security/SecurityConfig.java):
+1. **OAuth2 Resource Server**: Uses `NimbusJwtDecoder.withJwkSetUri(...)` with dynamic JWKS caching and key rotation.
+2. **Token Validators**:
+   - `JwtTimestampValidator`: Validates `exp`, `iat`, `nbf` with a 60-second clock skew tolerance.
+   - `JwtIssuerValidator`: Strict issuer matching.
+   - `AudienceValidator`: Enforces `aud == 'authenticated'`.
+   - `SubjectValidator`: Enforces `sub` is non-empty and parses into a valid RFC 4122 UUID.
+3. **RestAuthenticationEntryPoint**: Intercepts missing, invalid, or expired tokens and returns HTTP 401 with standardized JSON `ApiResponse.error("UNAUTHORIZED", ...)`.
+4. **RestAccessDeniedHandler**: Returns HTTP 403 with `ApiResponse.error("FORBIDDEN", ...)`.
+
+### 7.3 Transactional First-Login Provisioning
+Implemented in [`UserProvisioningService.java`](file:///d:/RIGHTFUL.com/backend/src/main/java/com/rightfull/identity/service/UserProvisioningService.java):
+1. User presents a valid Supabase JWT on any authenticated endpoint (e.g. `GET /api/v1/users/me`).
+2. Checks `users` table by `supabase_user_id`.
+3. If not found:
+   - Inserts `User` record from JWT verified claims (`sub`, `email`, `fullName`, `avatarUrl`).
+   - Generates personal workspace with sanitized slug adhering to `^[a-z0-9-]+$`.
+   - Inserts `WorkspaceMember` with `role = OWNER`.
+   - Inserts `UserPreferences` with `default_workspace_id = workspace.id`.
+   - Commits atomically within `@Transactional`.
+4. **Concurrency Safety**: Handled via `users(supabase_user_id)` unique constraint and graceful fallback in `DataIntegrityViolationException`.
+
+### 7.4 Database Connection Role & RLS Limitation
+- The current backend connects to Supabase PostgreSQL using role `postgres`, which carries PostgreSQL attribute `BYPASSRLS`.
+- Therefore, Row-Level Security does **not** restrict queries issued by the backend connection pool.
+- Security isolation is strictly enforced at the application tier via Spring Security method-level annotations (`@PreAuthorize("@workspaceSecurity.hasRole(...)")`) and JPA filtering.
+- **Production Roadmap**: Prior to general production launch, create a least-privilege role `rightful_app_role` (`NOBYPASSRLS`) and configure a Hibernate connection interceptor to execute `SET LOCAL app.current_workspace_id = :tenantId` at the start of each transaction.
+

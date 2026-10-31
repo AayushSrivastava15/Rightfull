@@ -1,6 +1,7 @@
-import type { ApiResponse, SystemHealth } from '@/types'
+import type { ApiResponse, SystemHealth, UserProfile } from '@/types'
+import { supabase } from '@/lib/supabaseClient'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1'
 
 export class ApiError extends Error {
   constructor(
@@ -14,7 +15,20 @@ export class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('rightful_token')
+  let token: string | undefined
+
+  if (typeof window !== 'undefined') {
+    token = localStorage.getItem('rightful_token') || undefined
+    if (!token) {
+      try {
+        const { data } = await supabase.auth.getSession()
+        token = data.session?.access_token
+      } catch (e) {
+        console.warn('Failed to retrieve Supabase session for API request:', e)
+      }
+    }
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -46,6 +60,9 @@ export const apiClient = {
   getHealth: async (): Promise<SystemHealth> => {
     return request<SystemHealth>('/health')
   },
+  getUserProfile: async (): Promise<UserProfile> => {
+    return request<UserProfile>('/users/me')
+  },
   get: <T>(endpoint: string) => request<T>(endpoint, { method: 'GET' }),
   post: <T>(endpoint: string, body: unknown) =>
     request<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
@@ -53,3 +70,4 @@ export const apiClient = {
     request<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
 }
+

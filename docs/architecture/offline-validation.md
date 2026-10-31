@@ -64,7 +64,7 @@ The following columns across the database schema directly support offline grace 
 | `license_plans` | `validation_interval_minutes`| `INTEGER` | Plan-level heartbeat interval override. |
 | `licenses` | `last_validated_at` | `TIMESTAMPTZ`| Last timestamp server certified entitlement validity. |
 | `licenses` | `offline_grace_period_hours`| `INTEGER` | Per-license specific grace duration override. |
-| `device_activations`| `last_heartbeat_at` | `TIMESTAMPTZ`| Device-specific timestamp of last received heartbeat. |
+| `activations`      | `last_heartbeat_at` | `TIMESTAMPTZ`| Device-specific timestamp of last received heartbeat. |
 | `activation_events`| `occurred_at` | `TIMESTAMPTZ`| Audit log timestamp of heartbeat attempt. |
 
 ---

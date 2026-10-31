@@ -50,6 +50,23 @@ class CryptoUtilsTest {
         assertTrue(CryptoUtils.constantTimeEquals(hash1, hash2));
         assertFalse(CryptoUtils.constantTimeEquals(hash1, diffKeyHash));
     }
+
+    @Test
+    @DisplayName("SHA-256 and secure token generation verification")
+    void testSha256AndSecureToken() {
+        String token = CryptoUtils.generateSecureToken(32);
+        assertNotNull(token);
+        assertEquals(64, token.length(), "32 bytes hex token must be 64 characters");
+
+        String hash1 = CryptoUtils.sha256Hex(token);
+        String hash2 = CryptoUtils.sha256Hex(token);
+        assertNotNull(hash1);
+        assertEquals(64, hash1.length(), "SHA-256 hash must be 64 hex characters");
+        assertEquals(hash1, hash2, "SHA-256 must be deterministic");
+
+        assertFalse(CryptoUtils.constantTimeEquals(token, hash1));
+        assertTrue(CryptoUtils.constantTimeEquals(hash1, hash2));
+    }
 }
 
 

@@ -1,34 +1,50 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
-import { AppLayout } from '@/layouts/AppLayout'
-import { AuthLayout } from '@/layouts/AuthLayout'
-import { DashboardPlaceholder } from '@/features/dashboard/DashboardPlaceholder'
-import { WorkspacesPlaceholder } from '@/features/workspaces/WorkspacesPlaceholder'
-import { ProductsPlaceholder } from '@/features/products/ProductsPlaceholder'
-import { LicensingPlaceholder } from '@/features/licensing/LicensingPlaceholder'
-import { CustomersPlaceholder } from '@/features/customers/CustomersPlaceholder'
-import { SettingsPlaceholder } from '@/features/settings/SettingsPlaceholder'
-import { AuthPlaceholder } from '@/features/auth/AuthPlaceholder'
+import { createFileRoute } from "@tanstack/react-router";
+import { Navbar } from "@/components/landing/Navbar";
+import { Hero } from "@/components/landing/Hero";
+import { Compat } from "@/components/landing/Compat";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Features } from "@/components/landing/Features";
+import { Integration } from "@/components/landing/Integration";
+import { DashboardPreview } from "@/components/landing/DashboardPreview";
+import { Pricing } from "@/components/landing/Pricing";
+import { Faq } from "@/components/landing/Faq";
+import { FinalCta } from "@/components/landing/FinalCta";
+import { Footer } from "@/components/landing/Footer";
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <AppLayout />,
-    children: [
-      { index: true, element: <DashboardPlaceholder /> },
-      { path: 'workspaces', element: <WorkspacesPlaceholder /> },
-      { path: 'products', element: <ProductsPlaceholder /> },
-      { path: 'licenses', element: <LicensingPlaceholder /> },
-      { path: 'customers', element: <CustomersPlaceholder /> },
-      { path: 'settings', element: <SettingsPlaceholder /> },
+const title = "Rightful: License your software, revoke in one click";
+const description =
+  "Free, open-source licensing for freelancers and small dev teams. Issue license keys, monitor usage, and revoke access instantly.";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title },
+      { name: "description", content: description },
+      { property: "og:title", content: title },
+      { property: "og:description", content: description },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
-  },
-  {
-    path: '/auth',
-    element: <AuthLayout />,
-    children: [{ index: true, element: <AuthPlaceholder /> }],
-  },
-  {
-    path: '*',
-    element: <Navigate to="/" replace />,
-  },
-])
+  }),
+  component: Index,
+});
+
+function Index() {
+  return (
+    <>
+      <Navbar />
+      <main>
+        <Hero />
+        <Compat />
+        <HowItWorks />
+        <Features />
+        <Integration />
+        <DashboardPreview />
+        <Pricing />
+        <Faq />
+        <FinalCta />
+      </main>
+      <Footer />
+    </>
+  );
+}
