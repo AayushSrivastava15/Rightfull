@@ -2,6 +2,7 @@ package com.rightfull.workspace.security;
 
 import com.rightfull.identity.entity.User;
 import com.rightfull.identity.repository.UserRepository;
+import com.rightfull.security.tenant.TenantContext;
 import com.rightfull.workspace.entity.WorkspaceMember;
 import com.rightfull.workspace.entity.WorkspaceRole;
 import com.rightfull.workspace.repository.WorkspaceMemberRepository;
@@ -79,6 +80,7 @@ public class WorkspaceSecurityEvaluator {
         Optional<WorkspaceMember> memberOpt = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId);
         if (memberOpt.isEmpty()) {
             log.warn("Access denied: User id={} has no membership in workspace id={}", userId, workspaceId);
+            TenantContext.clear();
             return false;
         }
 
@@ -86,6 +88,9 @@ public class WorkspaceSecurityEvaluator {
         boolean authorized = actualRole.hasAtLeast(requiredRole);
         if (!authorized) {
             log.warn("Access denied: User id={} has role={} but required={}", userId, actualRole, requiredRole);
+            TenantContext.clear();
+        } else {
+            TenantContext.set(workspaceId, userId, supabaseUserId, actualRole, userOpt.get().getEmail());
         }
 
         return authorized;

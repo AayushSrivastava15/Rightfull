@@ -21,6 +21,7 @@ import com.rightfull.workspace.entity.WorkspaceRole;
 import com.rightfull.workspace.repository.WorkspaceInvitationRepository;
 import com.rightfull.workspace.repository.WorkspaceMemberRepository;
 import com.rightfull.workspace.repository.WorkspaceRepository;
+import com.rightfull.security.tenant.TenantContextManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -51,6 +52,7 @@ public class WorkspaceInvitationService {
     private final UserPreferencesRepository userPreferencesRepository;
     private final EmailService emailService;
     private final WorkspaceAuditService auditService;
+    private final TenantContextManager tenantContextManager;
 
     public WorkspaceInvitationService(
             WorkspaceRepository workspaceRepository,
@@ -59,7 +61,8 @@ public class WorkspaceInvitationService {
             UserRepository userRepository,
             UserPreferencesRepository userPreferencesRepository,
             EmailService emailService,
-            WorkspaceAuditService auditService) {
+            WorkspaceAuditService auditService,
+            TenantContextManager tenantContextManager) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.workspaceInvitationRepository = workspaceInvitationRepository;
@@ -67,6 +70,7 @@ public class WorkspaceInvitationService {
         this.userPreferencesRepository = userPreferencesRepository;
         this.emailService = emailService;
         this.auditService = auditService;
+        this.tenantContextManager = tenantContextManager;
     }
 
     /**
@@ -212,6 +216,13 @@ public class WorkspaceInvitationService {
      */
     @Transactional
     public WorkspaceInvitationResponse acceptInvitation(String rawToken, User authenticatedUser) {
+        tenantContextManager.applyTenantContext(
+                null,
+                authenticatedUser.getId(),
+                authenticatedUser.getSupabaseUserId(),
+                authenticatedUser.getEmail()
+        );
+
         String tokenHash = CryptoUtils.sha256Hex(rawToken);
 
         WorkspaceInvitation invitation = workspaceInvitationRepository.findByTokenHash(tokenHash)
@@ -243,6 +254,12 @@ public class WorkspaceInvitationService {
         }
 
         Workspace workspace = invitation.getWorkspace();
+        tenantContextManager.applyTenantContext(
+                workspace.getId(),
+                authenticatedUser.getId(),
+                authenticatedUser.getSupabaseUserId(),
+                authenticatedUser.getEmail()
+        );
 
         // Add member if not already joined
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), authenticatedUser.getId())) {
@@ -286,10 +303,28 @@ public class WorkspaceInvitationService {
      */
     @Transactional
     public WorkspaceInvitationResponse rejectInvitation(String rawToken, User authenticatedUser) {
+        if (authenticatedUser != null) {
+            tenantContextManager.applyTenantContext(
+                    null,
+                    authenticatedUser.getId(),
+                    authenticatedUser.getSupabaseUserId(),
+                    authenticatedUser.getEmail()
+            );
+        }
+
         String tokenHash = CryptoUtils.sha256Hex(rawToken);
 
         WorkspaceInvitation invitation = workspaceInvitationRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid or non-existent invitation token"));
+
+        if (authenticatedUser != null) {
+            tenantContextManager.applyTenantContext(
+                    invitation.getWorkspace().getId(),
+                    authenticatedUser.getId(),
+                    authenticatedUser.getSupabaseUserId(),
+                    authenticatedUser.getEmail()
+            );
+        }
 
         if (invitation.getStatus() != WorkspaceInvitationStatus.PENDING) {
             throw new BusinessException(

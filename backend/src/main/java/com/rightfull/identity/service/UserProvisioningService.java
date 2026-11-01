@@ -65,8 +65,9 @@ public class UserProvisioningService {
 
     /**
      * Retrieves the complete, verified user profile and workspace memberships.
+     * Provisions the user and their personal workspace if accessing for the first time.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public UserProfileResponse getUserProfile(Jwt jwt) {
         User user = getOrCreateUser(jwt);
         Optional<UserPreferences> preferencesOpt = userPreferencesRepository.findByUserIdWithWorkspace(user.getId());

@@ -45,3 +45,92 @@ export interface UserProfile {
   memberships: WorkspaceMembership[]
 }
 
+export interface Product {
+  id: string
+  workspaceId: string
+  name: string
+  code: string
+  description?: string
+  status: 'ACTIVE' | 'ARCHIVED'
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LicenseConfiguration {
+  id: string
+  workspaceId: string
+  productId: string
+  name: string
+  description?: string
+  durationDays?: number | null
+  maximumActivations: number
+  seatLimit: number
+  offlineGracePeriodSeconds: number
+  revalidationIntervalSeconds: number
+  entitlements: Record<string, any>
+  status: 'ACTIVE' | 'ARCHIVED'
+  version: number
+  createdAt: string
+  updatedAt: string
+  archivedAt?: string
+}
+
+export interface CreateConfigurationInput {
+  name: string
+  description?: string
+  durationDays?: number | null
+  maximumActivations: number
+  seatLimit: number
+  offlineGracePeriodSeconds?: number
+  revalidationIntervalSeconds?: number
+  entitlements?: Record<string, any>
+}
+
+export interface UpdateConfigurationInput {
+  name: string
+  description?: string
+  durationDays?: number | null
+  maximumActivations: number
+  seatLimit: number
+  offlineGracePeriodSeconds: number
+  revalidationIntervalSeconds: number
+  entitlements?: Record<string, any>
+}
+
+export interface Customer {
+  id: string
+  workspaceId: string
+  name: string
+  email: string
+  company?: string
+  externalReference?: string
+  metadata: Record<string, any>
+  status: 'ACTIVE' | 'ARCHIVED'
+  createdAt: string
+  updatedAt: string
+  archivedAt?: string
+}
+
+export interface CreateCustomerInput {
+  name: string
+  email: string
+  company?: string
+  externalReference?: string
+  metadata?: Record<string, any>
+}
+
+export interface UpdateCustomerInput {
+  name: string
+  company?: string
+  externalReference?: string
+  metadata?: Record<string, any>
+}
+
+export interface PageResponse<T> {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
+}
+

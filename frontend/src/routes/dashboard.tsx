@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import {
   ShieldCheck,
   Building2,
@@ -10,8 +11,14 @@ import {
   Package,
   Layers,
   ArrowRight,
+  Sliders,
+  UserCheck,
+  LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { apiClient } from '@/services/apiClient'
+import { LicenseConfigurationPanel } from '@/components/licensing/LicenseConfigurationPanel'
+import { CustomerDirectoryPanel } from '@/components/licensing/CustomerDirectoryPanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -35,12 +42,24 @@ export const Route = createFileRoute('/dashboard')({
 function DashboardPage() {
   const navigate = useNavigate()
   const { session, profile, user, loading, signOut } = useAuth()
+  const [activeTab, setActiveTab] = useState<'overview' | 'configurations' | 'customers'>('overview')
 
   useEffect(() => {
     if (!loading && !session) {
       navigate({ to: '/login' })
     }
   }, [session, loading, navigate])
+
+  const defaultWs = profile?.defaultWorkspace
+  const memberships = profile?.memberships ?? []
+  const displayName = profile?.fullName || user?.email?.split('@')[0] || 'Developer'
+  const canManage = defaultWs?.role === 'OWNER' || defaultWs?.role === 'ADMIN'
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products', defaultWs?.id],
+    queryFn: () => (defaultWs?.id ? apiClient.getProducts(defaultWs.id) : Promise.resolve([])),
+    enabled: !!defaultWs?.id,
+  })
 
   if (loading) {
     return (
@@ -57,24 +76,54 @@ function DashboardPage() {
     return null
   }
 
-  const defaultWs = profile?.defaultWorkspace
-  const memberships = profile?.memberships ?? []
-  const displayName = profile?.fullName || user?.email?.split('@')[0] || 'Developer'
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       {/* Top Navigation */}
       <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-6 backdrop-blur">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600/10 text-blue-500 ring-1 ring-blue-500/20">
               <ShieldCheck className="h-5 w-5 text-blue-500" />
             </div>
             <span className="font-bold tracking-tight text-white">Rightful</span>
           </Link>
-          <Badge variant="outline" className="border-blue-500/20 bg-blue-500/10 text-blue-400 text-xs">
-            Workspace Console
-          </Badge>
+
+          {/* Navigation Tabs */}
+          <nav className="hidden md:flex items-center gap-1 border-l border-zinc-800 pl-6">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === 'overview'
+                  ? 'bg-zinc-800 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('configurations')}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === 'configurations'
+                  ? 'bg-zinc-800 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              <Sliders className="h-4 w-4" />
+              License Configurations
+            </button>
+            <button
+              onClick={() => setActiveTab('customers')}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === 'customers'
+                  ? 'bg-zinc-800 text-white'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              Customers
+            </button>
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">
@@ -113,8 +162,59 @@ function DashboardPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-6xl p-6 md:p-8 space-y-8">
-        {/* Welcome Banner */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur">
+        {/* Mobile Tab Pills */}
+        <div className="flex md:hidden items-center gap-2 border-b border-zinc-800 pb-3">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+              activeTab === 'overview'
+                ? 'bg-zinc-800 text-white'
+                : 'text-zinc-400'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('configurations')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+              activeTab === 'configurations'
+                ? 'bg-zinc-800 text-white'
+                : 'text-zinc-400'
+            }`}
+          >
+            Configurations
+          </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+              activeTab === 'customers'
+                ? 'bg-zinc-800 text-white'
+                : 'text-zinc-400'
+            }`}
+          >
+            Customers
+          </button>
+        </div>
+
+        {activeTab === 'configurations' && defaultWs?.id && (
+          <LicenseConfigurationPanel
+            workspaceId={defaultWs.id}
+            products={products}
+            canManage={canManage}
+          />
+        )}
+
+        {activeTab === 'customers' && defaultWs?.id && (
+          <CustomerDirectoryPanel
+            workspaceId={defaultWs.id}
+            canManage={canManage}
+          />
+        )}
+
+        {activeTab === 'overview' && (
+          <>
+            {/* Welcome Banner */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight text-white">
               Welcome back, {displayName}
@@ -184,13 +284,22 @@ function DashboardPage() {
               </div>
 
               <div className="flex gap-3">
-                <Button className="gap-2 bg-blue-600 hover:bg-blue-500 text-white" size="sm">
-                  <KeyRound className="h-4 w-4" />
-                  Issue New License
+                <Button
+                  className="gap-2 bg-blue-600 hover:bg-blue-500 text-white"
+                  size="sm"
+                  onClick={() => setActiveTab('configurations')}
+                >
+                  <Sliders className="h-4 w-4" />
+                  License Configurations
                 </Button>
-                <Button variant="outline" size="sm" className="border-zinc-700 bg-transparent hover:bg-zinc-800">
-                  <Package className="h-4 w-4 mr-1.5" />
-                  Register Product
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
+                  onClick={() => setActiveTab('customers')}
+                >
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Manage Customers
                 </Button>
               </div>
             </CardContent>
@@ -267,6 +376,8 @@ function DashboardPage() {
             </p>
           </div>
         </div>
+          </>
+        )}
       </main>
     </div>
   )

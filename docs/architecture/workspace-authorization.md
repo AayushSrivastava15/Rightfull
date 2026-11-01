@@ -217,14 +217,23 @@ Security-sensitive workspace operations dispatch structured audit records via `W
 - `MEMBER_REMOVED`
 - `DEFAULT_WORKSPACE_CHANGED`
 
-### 7.6 Multi-Tenant Security Limitations & Production Considerations
+### 7.6 Multi-Tenant Security Hardening (Step 3.9 Implementation)
 > [!IMPORTANT]
-> The backend connects to Supabase PostgreSQL using the administrative `postgres` user via the Session Pooler.
-> The `postgres` role has PostgreSQL superuser/`BYPASSRLS` privileges, which bypasses RLS policies on query execution.
-> Therefore, tenant boundary enforcement relies on the application layer:
-> 1. Spring Security method authorization (`@workspaceSecurity.hasRole`).
-> 2. Service-level membership and role verification.
-> 3. Verified Supabase JWT principal extraction (never trusting client-supplied user IDs).
-> Before production launch, an application database user with least privileges and transaction-scoped `SET LOCAL app.current_workspace_id = ?` must be provisioned.
+> Step 3.9 establishes defense-in-depth database isolation via PostgreSQL Row-Level Security (RLS) and least-privilege role separation:
+> 1. **Application Runtime Role (`rightfull_app`)**:
+>    - Dedicated non-superuser database role without `BYPASSRLS`.
+>    - Owns zero tables; granted only DML (`SELECT, INSERT, UPDATE, DELETE`) on `public` tables.
+> 2. **Transaction-Scoped Tenant Context**:
+>    - Set via parameterized `set_config('app.current_workspace_id', :wsId, true)` with `is_local = true`.
+>    - Automatically destroyed at transaction boundaries (commit or rollback), preventing connection pool leakage.
+> 3. **AOP Aspect & Thread-Local Protection**:
+>    - `TenantContextAspect` automatically binds `TenantContext` to the active PostgreSQL transaction.
+>    - `TenantContextCleanupFilter` unconditionally clears thread-local state on request completion.
+> 4. **Database-Level RLS Enforcement**:
+>    - Every tenant-scoped entity evaluates against `app_current_workspace_id()`.
+>    - Cross-workspace reads, writes, updates, and deletes are physically blocked by the PostgreSQL engine.
+> 5. **Immutable Persistent Auditing**:
+>    - `audit_logs` records all 11 lifecycle events.
+>    - Engine-level trigger `trg_audit_logs_prevent_mutation` prevents `UPDATE` and `DELETE` even by database administrators.
 
 

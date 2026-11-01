@@ -1,6 +1,6 @@
 import "./lib/error-capture";
 
-import { consumeLastCapturedError } from "./lib/error-capture";
+import { consumeLastCapturedError, isAbortLike } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
 type ServerEntry = {
@@ -16,6 +16,11 @@ async function getServerEntry(): Promise<ServerEntry> {
     );
   }
   return serverEntryPromise;
+}
+
+function isAbortError(error: unknown, request?: Request): boolean {
+  if (request?.signal?.aborted) return true;
+  return isAbortLike(error);
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body
@@ -51,6 +56,9 @@ export default {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
+      if (isAbortError(error, request)) {
+        return new Response(null, { status: 499, statusText: "Client Closed Request" });
+      }
       console.error(error);
       return new Response(renderErrorPage(), {
         status: 500,

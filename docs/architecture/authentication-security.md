@@ -175,9 +175,19 @@ Implemented in [`UserProvisioningService.java`](file:///d:/RIGHTFUL.com/backend/
    - Commits atomically within `@Transactional`.
 4. **Concurrency Safety**: Handled via `users(supabase_user_id)` unique constraint and graceful fallback in `DataIntegrityViolationException`.
 
-### 7.4 Database Connection Role & RLS Limitation
-- The current backend connects to Supabase PostgreSQL using role `postgres`, which carries PostgreSQL attribute `BYPASSRLS`.
-- Therefore, Row-Level Security does **not** restrict queries issued by the backend connection pool.
-- Security isolation is strictly enforced at the application tier via Spring Security method-level annotations (`@PreAuthorize("@workspaceSecurity.hasRole(...)")`) and JPA filtering.
-- **Production Roadmap**: Prior to general production launch, create a least-privilege role `rightful_app_role` (`NOBYPASSRLS`) and configure a Hibernate connection interceptor to execute `SET LOCAL app.current_workspace_id = :tenantId` at the start of each transaction.
+### 7.4 Multi-Tenant Database Isolation & Role Separation (Step 3.9 Implementation)
+- **Role Separation**:
+  - **Migration Administrator (`postgres`)**: Executes Flyway DDL migrations (`FLYWAY_USER`, `FLYWAY_PASSWORD`).
+  - **Application Runtime (`rightfull_app`)**: Restricted role with `NOBYPASSRLS`, `NOSUPERUSER`, `NOCREATEDB`. Granted strictly DML (`SELECT, INSERT, UPDATE, DELETE`) on `public` tables.
+- **Transaction-Scoped Tenant Context**:
+  - Managed by `TenantContextManager` and `TenantContextAspect`.
+  - Sets transaction-local PostgreSQL settings via `set_config('app.current_workspace_id', :wsId, true)` (`is_local = true`).
+  - PostgreSQL automatically unbinds and clears context upon transaction commit/rollback, guaranteeing zero pool contamination across pooled HikariCP connections.
+- **Row-Level Security (RLS)**:
+  - All tenant tables (`workspaces`, `workspace_members`, `workspace_invitations`, `audit_logs`) enforce RLS policies evaluated using `app_current_workspace_id()`.
+  - Attempts to read, write, update, or delete rows outside the active workspace are denied at the database engine level.
+- **Immutable Persistent Auditing**:
+  - Implemented in `PersistentWorkspaceAuditService` and `audit_logs` table.
+  - Immutability enforced by database trigger `trg_audit_logs_prevent_mutation`.
+  - Structured logs retained for SIEM monitoring. Sensitive credentials (passwords, tokens, private keys) are scrubbed before persistence.
 

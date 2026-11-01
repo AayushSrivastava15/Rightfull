@@ -543,18 +543,23 @@ Rightfull uses Flyway for reproducible, sequential database schema evolutions. S
 | Migration Script | Description | Tables Implemented | Applied Date | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | `V1__init_core_schema.sql` | Core Identity & Multi-Tenant Workspace Schema | `users`, `workspaces`, `user_preferences`, `workspace_members` | 2026-10-30 | **Applied & Verified** |
-| `V2__workspace_invitations.sql` | Workspace Invitations Schema | `workspace_invitations` | 2026-10-31 | **Prepared & Verified** |
+| `V2__workspace_invitations.sql` | Workspace Invitations Schema | `workspace_invitations` | 2026-10-31 | **Applied & Verified** |
+| `V3__audit_logs_and_rls.sql` | Audit Logs & Multi-Tenant Row-Level Security Policies | `audit_logs` + RLS policies on all tables | 2026-10-31 | **Applied & Verified** |
 
-### 5.2 Step 3.6 Core Schema Scope (V1)
-In accordance with Step 3.6 architectural directives:
-- Exactly 4 foundational tables are created:
+### 5.2 Step 3.9 Security Hardening Scope (V3)
+In accordance with Step 3.9 multi-tenant security hardening:
+- **Foundational Tables (1-5)**:
   1. `users`: Global identity linked to Supabase Auth (`supabase_user_id UUID UNIQUE`).
   2. `workspaces`: Multi-tenant organization boundaries (`slug` format checked, tier and status constrained).
   3. `user_preferences`: 1:1 user settings with fallback workspace references (`ON DELETE SET NULL`).
   4. `workspace_members`: RBAC memberships (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`) with `(workspace_id, user_id)` uniqueness.
-- **Step 3.8 Additions (V2)**:
   5. `workspace_invitations`: Team member invitations with SHA-256 token hashes, role constraints, single-use acceptance, and default-deny RLS.
-- **Intentionally Deferred Tables (6–22)**:
-  `products`, `product_settings`, `license_plans`, `plan_entitlements`, `customers`, `licenses`, `license_entitlements`, `license_key_hashes`, `activations`, `activation_events`, `orders`, `payments`, `subscriptions`, `api_keys`, `webhooks`, `webhook_events`, `audit_logs`.
-- **Row Level Security (RLS)**: Default-deny RLS is enabled on all tables (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`) with zero permissive public policies, shielding the schema from unauthorized PostgREST/client queries. The application connects via the Supabase Session Pooler with role `postgres` (`BYPASSRLS`), enforcing tenant boundaries at the Spring Boot application level.
+- **Audit Logging Table (6)**:
+  6. `audit_logs`: Immutable compliance and security audit logs tracking every administrative lifecycle event with PostgreSQL engine-level immutability trigger (`trg_audit_logs_prevent_mutation`).
+- **Least-Privilege Database Role (`rightfull_app`)**:
+  Dedicated non-superuser, non-BYPASSRLS application role granted strictly necessary `SELECT, INSERT, UPDATE, DELETE` on `public` tables and `USAGE, SELECT` on sequences. Migration DDL remains isolated to the administrative `postgres` role via `FLYWAY_USER`.
+- **Database Row-Level Security (RLS)**:
+  Every table enforces transaction-scoped RLS policies evaluated using `app_current_workspace_id()`, `app_current_user_id()`, and `app_current_supabase_user_id()`. Cross-tenant queries are blocked at the database engine level even if application-tier code contains a defect.
+- **Intentionally Deferred Tables (7–22)**:
+  `products`, `product_settings`, `license_plans`, `plan_entitlements`, `customers`, `licenses`, `license_entitlements`, `license_key_hashes`, `activations`, `activation_events`, `orders`, `payments`, `subscriptions`, `api_keys`, `webhooks`, `webhook_events`.
 

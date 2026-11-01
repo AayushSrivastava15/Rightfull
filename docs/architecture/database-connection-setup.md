@@ -53,12 +53,14 @@ To run Rightfull locally with the `local` profile, configure the following varia
 | Variable Name | Required? | Example Value | Description |
 | :--- | :---: | :--- | :--- |
 | `DATABASE_URL` | **Yes** | `jdbc:postgresql://aws-0-[region].pooler.supabase.com:5432/postgres?sslmode=require` | Supabase Session Pooler JDBC URL. |
-| `DATABASE_USER`| **Yes** | `postgres.[project-ref]` | Supabase database user (tenant-prefixed for pooler). |
-| `DATABASE_PASSWORD`| **Yes** | `[your-strong-password]` | Supabase database user password. |
+| `DATABASE_USER`| **Yes** | `rightfull_app.[project-ref]` | Runtime application user (least-privilege, `NOBYPASSRLS`). |
+| `DATABASE_PASSWORD`| **Yes** | `[your-app-password]` | Runtime application user password. |
+| `FLYWAY_ENABLED`| No | `true` | Flyway migration toggle. |
+| `FLYWAY_USER` | No | `postgres.[project-ref]` | Migration administrator user with DDL privileges. |
+| `FLYWAY_PASSWORD` | No | `[your-admin-password]` | Migration administrator password. |
 | `DATABASE_DRIVER` | No | `org.postgresql.Driver` | JDBC driver class name. |
 | `SPRING_PROFILES_ACTIVE` | No | `local` | Active Spring profile (defaults to `local`). |
 | `PORT` | No | `8080` | HTTP server port. |
-| `FLYWAY_ENABLED`| No | `false` | Flyway migration toggle (disabled until Step 3.6). |
 
 ### 3.1 Template Reference
 A sanitized template is provided at [`backend/.env.example`](file:///d:/RIGHTFUL.com/backend/.env.example):

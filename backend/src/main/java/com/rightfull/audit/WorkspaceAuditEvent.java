@@ -20,6 +20,14 @@ public record WorkspaceAuditEvent(
             WorkspaceAuditEventType eventType,
             UUID workspaceId,
             UUID actorUserId,
+            Map<String, Object> details) {
+        return of(eventType, workspaceId, actorUserId, null, details);
+    }
+
+    public static WorkspaceAuditEvent of(
+            WorkspaceAuditEventType eventType,
+            UUID workspaceId,
+            UUID actorUserId,
             UUID targetUserId,
             Map<String, Object> details) {
         return new WorkspaceAuditEvent(

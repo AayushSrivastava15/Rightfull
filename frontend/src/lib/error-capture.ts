@@ -49,11 +49,33 @@ function isErrorLike(value: unknown): value is Error {
   return value instanceof Error;
 }
 
+export function isAbortLike(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const err = value as Record<string, unknown>;
+  if (
+    err.name === "AbortError" ||
+    err.code === "ECONNRESET" ||
+    err.code === "ERR_STREAM_PREMATURE_CLOSE"
+  ) {
+    return true;
+  }
+  if (
+    typeof err.message === "string" &&
+    (err.message === "aborted" || err.message.includes("aborted"))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 // Wrap console.error so errors logged by any layer — including h3's internal
 // unhandled-error logging, which this file cannot hook directly — are both
 // recorded for consumeLastCapturedError and expanded before serialization.
 const originalConsoleError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
+  if (args.some(isAbortLike)) {
+    return;
+  }
   const expanded = args.map((arg) => {
     if (!isErrorLike(arg)) return arg;
     record(arg);
@@ -63,10 +85,14 @@ console.error = (...args: unknown[]) => {
 };
 
 if (typeof globalThis.addEventListener === "function") {
-  globalThis.addEventListener("error", (event) => record((event as ErrorEvent).error ?? event));
-  globalThis.addEventListener("unhandledrejection", (event) =>
-    record((event as PromiseRejectionEvent).reason),
-  );
+  globalThis.addEventListener("error", (event) => {
+    const err = (event as ErrorEvent).error ?? event;
+    if (!isAbortLike(err)) record(err);
+  });
+  globalThis.addEventListener("unhandledrejection", (event) => {
+    const reason = (event as PromiseRejectionEvent).reason;
+    if (!isAbortLike(reason)) record(reason);
+  });
 }
 
 export function consumeLastCapturedError(): unknown {

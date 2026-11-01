@@ -37,6 +37,10 @@ public class ApiResponse<T> {
         return new ApiResponse<>(true, data, message);
     }
 
+    public static <T> ApiResponse<T> created(T data, String message) {
+        return new ApiResponse<>(true, data, message);
+    }
+
     public static <T> ApiResponse<T> error(String code, String message, String path) {
         ApiResponse<T> response = new ApiResponse<>();
         response.setSuccess(false);

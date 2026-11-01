@@ -62,6 +62,9 @@ class WorkspaceInvitationServiceTest {
     @Mock
     private WorkspaceAuditService auditService;
 
+    @Mock
+    private com.rightfull.security.tenant.TenantContextManager tenantContextManager;
+
     private WorkspaceInvitationService invitationService;
 
     private Workspace workspace;
@@ -77,7 +80,8 @@ class WorkspaceInvitationServiceTest {
                 userRepository,
                 userPreferencesRepository,
                 emailService,
-                auditService
+                auditService,
+                tenantContextManager
         );
 
         workspaceId = UUID.randomUUID();
