@@ -66,6 +66,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/health/**",
+                                "/api/v1/licenses/validate",
+                                "/api/v1/licenses/activate",
+                                "/api/v1/licenses/deactivate",
+                                "/api/v1/licenses/heartbeat",
                                 "/favicon.ico",
                                 "/static/**",
                                 "/actuator/**",

@@ -32,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -165,8 +166,8 @@ export function CustomerDirectoryPanel({
     if (editingCustomer) {
       const updateData: UpdateCustomerInput = {
         name: name.trim(),
-        company: company.trim() || undefined,
-        externalReference: externalReference.trim() || undefined,
+        ...(company.trim() ? { company: company.trim() } : {}),
+        ...(externalReference.trim() ? { externalReference: externalReference.trim() } : {}),
         metadata: parsedMetadata,
       }
       updateMutation.mutate({ id: editingCustomer.id, data: updateData })
@@ -174,8 +175,8 @@ export function CustomerDirectoryPanel({
       const createData: CreateCustomerInput = {
         name: name.trim(),
         email: email.trim(),
-        company: company.trim() || undefined,
-        externalReference: externalReference.trim() || undefined,
+        ...(company.trim() ? { company: company.trim() } : {}),
+        ...(externalReference.trim() ? { externalReference: externalReference.trim() } : {}),
         metadata: parsedMetadata,
       }
       createMutation.mutate(createData)
@@ -188,13 +189,13 @@ export function CustomerDirectoryPanel({
   return (
     <div className="space-y-6">
       {/* Principle & Optionality Callout */}
-      <div className="flex items-start gap-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-zinc-300">
-        <div className="mt-0.5 rounded-lg bg-indigo-500/10 p-2 text-indigo-400 ring-1 ring-indigo-500/20">
+      <div className="flex items-start gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-foreground">
+        <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary ring-1 ring-primary/20">
           <Info className="h-5 w-5" />
         </div>
         <div className="space-y-1 text-sm">
-          <p className="font-semibold text-white">Optional Customer Management</p>
-          <p className="text-xs text-zinc-400">
+          <p className="font-semibold text-foreground">Optional Customer Management</p>
+          <p className="text-xs text-muted-foreground">
             Rightful supports named customer assignment for B2B contracts, as well as anonymous,
             device-bound, or standalone license keys without a customer record. Customer records are
             never a mandatory prerequisite for licensing.
@@ -206,7 +207,7 @@ export function CustomerDirectoryPanel({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 items-center gap-3">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => {
@@ -214,7 +215,7 @@ export function CustomerDirectoryPanel({
                 setPage(0)
               }}
               placeholder="Search customers by name or email..."
-              className="pl-9 border-zinc-800 bg-zinc-900 text-white placeholder:text-zinc-500 text-sm"
+              className="pl-9 text-sm"
             />
           </div>
 
@@ -224,7 +225,7 @@ export function CustomerDirectoryPanel({
               setStatusFilter(e.target.value as any)
               setPage(0)
             }}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-lg border border-border/80 bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active Only</option>
@@ -236,7 +237,7 @@ export function CustomerDirectoryPanel({
           <Button
             onClick={openCreate}
             size="sm"
-            className="gap-2 bg-indigo-600 hover:bg-indigo-500 text-white"
+            className="gap-2"
           >
             <Plus className="h-4 w-4" />
             Register Customer
@@ -246,27 +247,27 @@ export function CustomerDirectoryPanel({
 
       {/* Customers Table / Grid */}
       {isLoading ? (
-        <div className="flex justify-center p-12 text-zinc-400">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <div className="flex justify-center p-12 text-muted-foreground">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-sm text-red-400">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm text-destructive">
           Failed to load customers directory.
         </div>
       ) : customers.length === 0 ? (
-        <Card className="border-dashed border-zinc-800 bg-zinc-900/20 text-center py-12">
+        <Card className="border-dashed border-border/80 bg-muted/20 text-center py-12">
           <CardContent className="space-y-3">
-            <Users className="mx-auto h-10 w-10 text-zinc-600" />
+            <Users className="mx-auto h-10 w-10 text-muted-foreground" />
             <div className="space-y-1">
-              <h3 className="font-semibold text-white">No Customers Found</h3>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              <h3 className="font-semibold text-foreground">No Customers Found</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 {searchQuery
                   ? `No matching customer records for "${searchQuery}".`
                   : 'Register client organizations or individual licensees to associate with issued license keys.'}
               </p>
             </div>
             {canManage && !searchQuery && (
-              <Button onClick={openCreate} size="sm" variant="outline" className="border-zinc-700 text-zinc-300">
+              <Button onClick={openCreate} size="sm" variant="outline">
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add First Customer
               </Button>
@@ -275,9 +276,9 @@ export function CustomerDirectoryPanel({
         </Card>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-lg">
-            <table className="w-full text-left text-sm text-zinc-300">
-              <thead className="border-b border-zinc-800 bg-zinc-950/50 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs">
+            <table className="w-full text-left text-sm text-foreground">
+              <thead className="border-b border-border/70 bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Customer / Email</th>
                   <th className="px-4 py-3">Company</th>
@@ -286,38 +287,38 @@ export function CustomerDirectoryPanel({
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60 text-xs">
+              <tbody className="divide-y divide-border/60 text-xs">
                 {customers.map((c) => (
                   <tr
                     key={c.id}
-                    className={`hover:bg-zinc-800/30 transition-colors ${
+                    className={`hover:bg-muted/40 transition-colors ${
                       c.status === 'ARCHIVED' ? 'opacity-60' : ''
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-white">{c.name}</div>
-                      <div className="flex items-center gap-1 text-zinc-400 font-mono text-[11px]">
-                        <Mail className="h-3 w-3 text-zinc-500" />
+                      <div className="font-semibold text-foreground">{c.name}</div>
+                      <div className="flex items-center gap-1 text-muted-foreground font-mono text-[11px]">
+                        <Mail className="h-3 w-3 text-muted-foreground" />
                         {c.email}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       {c.company ? (
-                        <div className="flex items-center gap-1.5 text-zinc-300">
-                          <Building className="h-3.5 w-3.5 text-zinc-500" />
+                        <div className="flex items-center gap-1.5 text-foreground">
+                          <Building className="h-3.5 w-3.5 text-muted-foreground" />
                           <span>{c.company}</span>
                         </div>
                       ) : (
-                        <span className="text-zinc-600">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-[11px]">
                       {c.externalReference ? (
-                        <Badge variant="outline" className="border-zinc-800 text-zinc-400 font-mono text-[10px]">
+                        <Badge variant="outline" className="border-border/70 text-muted-foreground font-mono text-[10px]">
                           {c.externalReference}
                         </Badge>
                       ) : (
-                        <span className="text-zinc-600">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -325,8 +326,8 @@ export function CustomerDirectoryPanel({
                         variant={c.status === 'ACTIVE' ? 'default' : 'secondary'}
                         className={
                           c.status === 'ACTIVE'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]'
-                            : 'bg-zinc-800 text-zinc-400 text-[10px]'
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px]'
+                            : 'bg-muted text-muted-foreground text-[10px]'
                         }
                       >
                         {c.status}
@@ -337,7 +338,7 @@ export function CustomerDirectoryPanel({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0 text-zinc-400 hover:text-white"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                           onClick={() => setViewingCustomer(c)}
                           title="View Profile & Metadata"
                         >
@@ -349,7 +350,7 @@ export function CustomerDirectoryPanel({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-zinc-400 hover:text-white"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                               onClick={() => openEdit(c)}
                               title="Edit Customer"
                             >
@@ -358,7 +359,7 @@ export function CustomerDirectoryPanel({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-zinc-400 hover:text-red-400"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                               onClick={() => archiveMutation.mutate(c.id)}
                               disabled={archiveMutation.isPending}
                               title="Archive Customer"
@@ -377,7 +378,7 @@ export function CustomerDirectoryPanel({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-2 text-xs text-zinc-400">
+            <div className="flex items-center justify-between px-2 text-xs text-muted-foreground">
               <span>
                 Page {page + 1} of {totalPages} ({pageData?.totalElements} total customers)
               </span>
@@ -387,7 +388,7 @@ export function CustomerDirectoryPanel({
                   size="sm"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="h-7 border-zinc-800 text-zinc-400"
+                  className="h-7"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
@@ -396,7 +397,7 @@ export function CustomerDirectoryPanel({
                   size="sm"
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="h-7 border-zinc-800 text-zinc-400"
+                  className="h-7"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
@@ -416,78 +417,74 @@ export function CustomerDirectoryPanel({
           }
         }}
       >
-        <DialogContent className="max-w-md border-zinc-800 bg-zinc-950 text-zinc-100">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
-              <Users className="h-5 w-5 text-indigo-400" />
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
               {editingCustomer ? 'Edit Customer' : 'Register Customer'}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               {editingCustomer
                 ? 'Update customer details and custom metadata attributes.'
                 : 'Customer directory entries can be linked to issued software licenses.'}
             </DialogDescription>
           </DialogHeader>
 
-          {formError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+          <DialogBody className="space-y-3.5 py-4 text-sm">
+            {formError && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
-          <div className="space-y-3 py-2 text-sm">
             <div className="space-y-1">
-              <Label htmlFor="cust-name">Full Name or Account Name *</Label>
+              <Label htmlFor="cust-name" className="text-foreground">Full Name or Account Name *</Label>
               <Input
                 id="cust-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Jane Doe, Acme Security Inc."
-                className="border-zinc-800 bg-zinc-900 text-white"
               />
             </div>
 
             {!editingCustomer && (
               <div className="space-y-1">
-                <Label htmlFor="cust-email">Contact Email *</Label>
+                <Label htmlFor="cust-email" className="text-foreground">Contact Email *</Label>
                 <Input
                   id="cust-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="billing@acme.com"
-                  className="border-zinc-800 bg-zinc-900 text-white"
                 />
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="cust-company">Company</Label>
+                <Label htmlFor="cust-company" className="text-foreground">Company</Label>
                 <Input
                   id="cust-company"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder="Acme Corp"
-                  className="border-zinc-800 bg-zinc-900 text-white"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="cust-extref">External Reference</Label>
+                <Label htmlFor="cust-extref" className="text-foreground">External Reference</Label>
                 <Input
                   id="cust-extref"
                   value={externalReference}
                   onChange={(e) => setExternalReference(e.target.value)}
                   placeholder="CRM-98765"
-                  className="border-zinc-800 bg-zinc-900 text-white"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <Code2 className="h-3.5 w-3.5 text-indigo-400" />
+              <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Code2 className="h-3.5 w-3.5 text-primary" />
                 Custom Metadata (JSON)
               </Label>
               <Textarea
@@ -495,12 +492,12 @@ export function CustomerDirectoryPanel({
                 value={metadataText}
                 onChange={(e) => setMetadataText(e.target.value)}
                 placeholder='{\n  "vat_number": "GB123456789",\n  "tier": "enterprise"\n}'
-                className="font-mono text-xs border-zinc-800 bg-zinc-900 text-zinc-200"
+                className="font-mono text-xs"
               />
             </div>
-          </div>
+          </DialogBody>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter>
             <Button
               variant="outline"
               size="sm"
@@ -508,17 +505,15 @@ export function CustomerDirectoryPanel({
                 setIsCreateOpen(false)
                 setEditingCustomer(null)
               }}
-              className="border-zinc-800 text-zinc-400"
             >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white"
+              loading={createMutation.isPending || updateMutation.isPending}
             >
-              {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save Customer'}
+              Save Customer
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -529,68 +524,68 @@ export function CustomerDirectoryPanel({
         open={!!viewingCustomer}
         onOpenChange={(open) => !open && setViewingCustomer(null)}
       >
-        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 max-w-lg">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
-              <Users className="h-4 w-4 text-indigo-400" />
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
               Customer Profile
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Workspace-scoped client directory record and external metadata.
             </DialogDescription>
           </DialogHeader>
 
           {viewingCustomer && (
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+            <DialogBody className="space-y-4 text-xs py-4">
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/30 p-3.5">
                 <div>
-                  <span className="text-zinc-500 block">Name</span>
-                  <span className="font-semibold text-white">{viewingCustomer.name}</span>
+                  <span className="text-muted-foreground block text-[11px]">Name</span>
+                  <span className="font-semibold text-foreground">{viewingCustomer.name}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block">Email</span>
-                  <span className="font-mono text-zinc-300">{viewingCustomer.email}</span>
+                  <span className="text-muted-foreground block text-[11px]">Email</span>
+                  <span className="font-mono text-foreground">{viewingCustomer.email}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block">Company</span>
-                  <span className="text-zinc-300">{viewingCustomer.company || '—'}</span>
+                  <span className="text-muted-foreground block text-[11px]">Company</span>
+                  <span className="text-foreground">{viewingCustomer.company || '—'}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block">External Ref</span>
-                  <span className="font-mono text-zinc-300">
+                  <span className="text-muted-foreground block text-[11px]">External Ref</span>
+                  <span className="font-mono text-foreground">
                     {viewingCustomer.externalReference || '—'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block">Status</span>
+                  <span className="text-muted-foreground block text-[11px]">Status</span>
                   <Badge
                     variant="outline"
-                    className="border-zinc-700 text-zinc-300 text-[10px] mt-0.5"
+                    className="border-border/70 text-muted-foreground text-[10px] mt-0.5"
                   >
                     {viewingCustomer.status}
                   </Badge>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block">Registered</span>
-                  <span className="text-zinc-400">
+                  <span className="text-muted-foreground block text-[11px]">Registered</span>
+                  <span className="text-muted-foreground">
                     {new Date(viewingCustomer.createdAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <span className="font-semibold text-zinc-300 block">Metadata JSON</span>
-                <pre className="p-3 rounded-lg bg-zinc-900 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-48 border border-zinc-800">
+                <span className="font-semibold text-foreground block">Metadata JSON</span>
+                <pre className="p-3 rounded-xl bg-muted/40 text-foreground font-mono text-[11px] overflow-x-auto max-h-48 border border-border/60 custom-scrollbar">
                   {JSON.stringify(viewingCustomer.metadata || {}, null, 2)}
                 </pre>
               </div>
 
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/20 p-2.5 text-zinc-400 text-[11px]">
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-muted-foreground text-[11px]">
                 <p>
                   <strong>Associated Licenses:</strong> In Phase 4.2+, issued licenses will appear here when assigned to this customer account.
                 </p>
               </div>
-            </div>
+            </DialogBody>
           )}
 
           <DialogFooter>
@@ -598,7 +593,6 @@ export function CustomerDirectoryPanel({
               size="sm"
               variant="outline"
               onClick={() => setViewingCustomer(null)}
-              className="border-zinc-800 text-zinc-300"
             >
               Close
             </Button>

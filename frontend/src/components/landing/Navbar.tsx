@@ -5,23 +5,41 @@ import { content } from "@/content";
 import { pill } from "./primitives";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(true);
   const { session } = useAuth();
 
+  let themeContext: ReturnType<typeof useTheme> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    themeContext = useTheme();
+  } catch {
+    // Rendered outside ThemeProvider (e.g. in some isolated unit test)
+  }
+
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+    if (themeContext) {
+      setDark(themeContext.resolvedTheme === "dark");
+    } else {
+      setDark(document.documentElement.classList.contains("dark"));
+    }
+  }, [themeContext?.resolvedTheme]);
 
   const toggle = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    try {
-      localStorage.setItem("theme", next ? "dark" : "light");
-    } catch {}
+    if (themeContext) {
+      themeContext.setTheme(next ? "dark" : "light");
+    } else {
+      document.documentElement.classList.toggle("dark", next);
+      document.body?.classList.toggle("dark", next);
+      try {
+        localStorage.setItem("rightfull-theme", next ? "dark" : "light");
+      } catch {}
+    }
   };
 
   return (

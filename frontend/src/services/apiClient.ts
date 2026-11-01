@@ -10,10 +10,16 @@ import type {
   CreateCustomerInput,
   UpdateCustomerInput,
   PageResponse,
+  License,
+  IssueLicenseInput,
+  IssueLicenseResponse,
+  LicenseSummary,
+  LicenseActivation,
+  LicenseStatus,
 } from '@/types'
 import { supabase } from '@/lib/supabaseClient'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1'
+const API_BASE_URL = import.meta.env['VITE_API_BASE_URL'] || 'http://localhost:8080/api/v1'
 
 export class ApiError extends Error {
   constructor(
@@ -70,7 +76,27 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const apiClient = {
   getHealth: async (): Promise<SystemHealth> => {
-    return request<SystemHealth>('/health')
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`)
+      if (!response.ok) {
+        return { status: 'DOWN', version: '1.0.0', product: 'rightfull', timestamp: new Date().toISOString() }
+      }
+      const json = await response.json()
+      if (json?.data?.status) {
+        return json.data as SystemHealth
+      }
+      if (json?.status) {
+        return {
+          status: json.status,
+          version: json.version || '1.0.0',
+          product: json.application || 'rightfull',
+          timestamp: new Date().toISOString()
+        }
+      }
+      return { status: 'DOWN', version: '1.0.0', product: 'rightfull', timestamp: new Date().toISOString() }
+    } catch {
+      return { status: 'DOWN', version: '1.0.0', product: 'rightfull', timestamp: new Date().toISOString() }
+    }
   },
   getUserProfile: async (): Promise<UserProfile> => {
     return request<UserProfile>('/users/me')
@@ -84,7 +110,45 @@ export const apiClient = {
 
   // Products
   getProducts: async (workspaceId: string): Promise<Product[]> => {
-    return request<Product[]>(`/products?workspaceId=${workspaceId}`)
+    const res = await request<any>(`/products?workspaceId=${workspaceId}`)
+    // Handle both Page<Product> and Product[] responses gracefully
+    if (res && Array.isArray(res.content)) {
+      return res.content as Product[]
+    }
+    if (Array.isArray(res)) {
+      return res as Product[]
+    }
+    return []
+  },
+
+  createProduct: async (
+    workspaceId: string,
+    data: { name: string; slug: string; description?: string }
+  ): Promise<Product> => {
+    return request<Product>(`/products?workspaceId=${workspaceId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  archiveProduct: async (
+    workspaceId: string,
+    productId: string
+  ): Promise<Product> => {
+    return request<Product>(
+      `/products/${productId}/archive?workspaceId=${workspaceId}`,
+      { method: 'POST' }
+    )
+  },
+
+  rotateSigningKey: async (
+    workspaceId: string,
+    productId: string
+  ): Promise<any> => {
+    return request<any>(
+      `/products/${productId}/signing-keys/rotate?workspaceId=${workspaceId}`,
+      { method: 'POST' }
+    )
   },
 
   // License Configurations
@@ -189,6 +253,112 @@ export const apiClient = {
     return request<Customer>(`/customers/${customerId}/archive?workspaceId=${workspaceId}`, {
       method: 'POST',
     })
+  },
+
+  // Licenses
+  getLicenses: async (
+    workspaceId: string,
+    productId?: string,
+    customerId?: string,
+    status?: LicenseStatus,
+    search?: string,
+    page = 0,
+    size = 20
+  ): Promise<PageResponse<License>> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      size: size.toString(),
+    })
+    if (productId) params.append('productId', productId)
+    if (customerId) params.append('customerId', customerId)
+    if (status) params.append('status', status)
+    if (search) params.append('search', search)
+
+    return request<PageResponse<License>>(`/workspaces/${workspaceId}/licenses?${params.toString()}`)
+  },
+
+  getLicenseSummary: async (workspaceId: string): Promise<LicenseSummary> => {
+    return request<LicenseSummary>(`/workspaces/${workspaceId}/licenses/summary`)
+  },
+
+  getLicense: async (workspaceId: string, licenseId: string): Promise<License> => {
+    return request<License>(`/licenses/${licenseId}?workspaceId=${workspaceId}`)
+  },
+
+  issueLicense: async (
+    workspaceId: string,
+    productId: string,
+    data: IssueLicenseInput
+  ): Promise<IssueLicenseResponse> => {
+    return request<IssueLicenseResponse>(`/products/${productId}/licenses?workspaceId=${workspaceId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  suspendLicense: async (
+    workspaceId: string,
+    licenseId: string,
+    reason?: string
+  ): Promise<License> => {
+    return request<License>(`/licenses/${licenseId}/suspend?workspaceId=${workspaceId}`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Administrative suspension' }),
+    })
+  },
+
+  resumeLicense: async (workspaceId: string, licenseId: string): Promise<License> => {
+    return request<License>(`/licenses/${licenseId}/resume?workspaceId=${workspaceId}`, {
+      method: 'POST',
+    })
+  },
+
+  revokeLicense: async (
+    workspaceId: string,
+    licenseId: string,
+    reason?: string
+  ): Promise<License> => {
+    return request<License>(`/licenses/${licenseId}/revoke?workspaceId=${workspaceId}`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Administrative revocation' }),
+    })
+  },
+
+  renewLicense: async (
+    workspaceId: string,
+    licenseId: string,
+    extensionDays?: number,
+    newExpiresAt?: string
+  ): Promise<License> => {
+    return request<License>(`/licenses/${licenseId}/renew?workspaceId=${workspaceId}`, {
+      method: 'POST',
+      body: JSON.stringify({ extensionDays, newExpiresAt }),
+    })
+  },
+
+  getLicenseActivations: async (
+    workspaceId: string,
+    licenseId: string,
+    page = 0,
+    size = 20
+  ): Promise<PageResponse<LicenseActivation>> => {
+    const params = new URLSearchParams({
+      workspaceId,
+      page: page.toString(),
+      size: size.toString(),
+    })
+    return request<PageResponse<LicenseActivation>>(`/licenses/${licenseId}/activations?${params.toString()}`)
+  },
+
+  deactivateDevice: async (
+    workspaceId: string,
+    licenseId: string,
+    activationId: string
+  ): Promise<LicenseActivation> => {
+    return request<LicenseActivation>(
+      `/licenses/${licenseId}/activations/${activationId}/deactivate?workspaceId=${workspaceId}`,
+      { method: 'POST' }
+    )
   },
 }
 

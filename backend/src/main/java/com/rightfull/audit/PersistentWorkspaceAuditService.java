@@ -80,6 +80,8 @@ public class PersistentWorkspaceAuditService implements WorkspaceAuditService {
         clean.remove("password");
         clean.remove("token");
         clean.remove("rawToken");
+        clean.remove("licenseKey");
+        clean.remove("rawKey");
         clean.remove("secret");
         clean.remove("privateKey");
         clean.remove("encryptedPrivateKey");
@@ -96,6 +98,8 @@ public class PersistentWorkspaceAuditService implements WorkspaceAuditService {
             case SIGNING_KEY_GENERATED, SIGNING_KEY_ROTATED, SIGNING_KEY_REVOKED -> "SIGNING_KEY";
             case PLAN_CREATED, PLAN_UPDATED, PLAN_ARCHIVED -> "PLAN";
             case CUSTOMER_CREATED, CUSTOMER_UPDATED, CUSTOMER_ARCHIVED -> "CUSTOMER";
+            case LICENSE_ISSUED, LICENSE_SUSPENDED, LICENSE_RESUMED, LICENSE_REVOKED, LICENSE_RENEWED -> "LICENSE";
+            case DEVICE_ACTIVATED, DEVICE_DEACTIVATED -> "ACTIVATION";
         };
     }
 }

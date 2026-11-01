@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -114,13 +115,34 @@ export function AuthCardFlip({ initialMode = "login" }: AuthCardFlipProps) {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  let themeContext: ReturnType<typeof useTheme> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    themeContext = useTheme();
+  } catch {
+    // Rendered outside ThemeProvider (e.g. in test)
+  }
+
+  useEffect(() => {
+    if (themeContext) {
+      setDark(themeContext.resolvedTheme === "dark");
+    } else {
+      setDark(document.documentElement.classList.contains("dark"));
+    }
+  }, [themeContext?.resolvedTheme]);
+
   const toggleTheme = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    try {
-      localStorage.setItem("theme", next ? "dark" : "light");
-    } catch {}
+    if (themeContext) {
+      themeContext.setTheme(next ? "dark" : "light");
+    } else {
+      document.documentElement.classList.toggle("dark", next);
+      document.body?.classList.toggle("dark", next);
+      try {
+        localStorage.setItem("rightfull-theme", next ? "dark" : "light");
+      } catch {}
+    }
   };
 
   const flipTo = (target: "login" | "signup") => {

@@ -148,7 +148,7 @@ describe('LicenseConfigurationPanel Component', () => {
     const inspectBtns = await screen.findAllByRole('button', {
       name: /Inspect Entitlements/i,
     })
-    fireEvent.click(inspectBtns[0])
+    fireEvent.click(inspectBtns[0]!)
 
     expect(screen.getByText('Entitlements Payload')).toBeInTheDocument()
     expect(screen.getByText(/"pdf_export": true/i)).toBeInTheDocument()

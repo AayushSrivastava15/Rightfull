@@ -113,7 +113,7 @@ describe('CustomerDirectoryPanel Component', () => {
     renderComponent()
 
     const viewBtns = await screen.findAllByTitle('View Profile & Metadata')
-    fireEvent.click(viewBtns[0])
+    fireEvent.click(viewBtns[0]!)
 
     expect(screen.getByRole('heading', { name: 'Customer Profile' })).toBeInTheDocument()
     expect(screen.getByText(/"tier": "vip"/i)).toBeInTheDocument()

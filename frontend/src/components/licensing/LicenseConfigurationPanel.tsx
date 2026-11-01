@@ -35,10 +35,12 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -189,7 +191,7 @@ export function LicenseConfigurationPanel({
 
     const payload: CreateConfigurationInput = {
       name: name.trim(),
-      description: description.trim() || undefined,
+      ...(description.trim() ? { description: description.trim() } : {}),
       durationDays: isPerpetual ? null : Number(durationDays),
       maximumActivations: Number(maxActivations),
       seatLimit: Number(seatLimit),
@@ -211,15 +213,15 @@ export function LicenseConfigurationPanel({
   return (
     <div className="space-y-6">
       {/* Principle & Architectural Clarification Callout */}
-      <div className="flex items-start gap-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-zinc-300">
-        <div className="mt-0.5 rounded-lg bg-blue-500/10 p-2 text-blue-400 ring-1 ring-blue-500/20">
+      <div className="flex items-start gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-foreground">
+        <div className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary ring-1 ring-primary/20">
           <Info className="h-5 w-5" />
         </div>
         <div className="space-y-1 text-sm">
-          <p className="font-semibold text-white">
+          <p className="font-semibold text-foreground">
             Licensing Infrastructure Presets
           </p>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-muted-foreground">
             Rightful delivers cryptographically signed permissions and restrictions defined by you.
             These configurations are reusable presets to streamline license issuance. They are not
             rigid billing plans, pricing models, or forced feature flags.
@@ -230,14 +232,14 @@ export function LicenseConfigurationPanel({
       {/* Header & Product Selector */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Label htmlFor="product-select" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <Label htmlFor="product-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Product:
           </Label>
           <select
             id="product-select"
             value={selectedProductId}
             onChange={(e) => setSelectedProductId(e.target.value)}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-lg border border-border/80 bg-background px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {products.map((p) => (
               <option key={p.id} value={p.id}>
@@ -251,7 +253,7 @@ export function LicenseConfigurationPanel({
           <Button
             onClick={openCreate}
             size="sm"
-            className="gap-2 bg-blue-600 hover:bg-blue-500 text-white"
+            className="gap-2"
             disabled={!selectedProductId || activeProduct?.status === 'ARCHIVED'}
           >
             <Plus className="h-4 w-4" />
@@ -262,25 +264,25 @@ export function LicenseConfigurationPanel({
 
       {/* Configurations List */}
       {isLoading ? (
-        <div className="flex justify-center p-12 text-zinc-400">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="flex justify-center p-12 text-muted-foreground">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-sm text-red-400">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm text-destructive">
           Failed to load license configurations. Please verify your workspace permissions.
         </div>
       ) : configurations.length === 0 ? (
-        <Card className="border-dashed border-zinc-800 bg-zinc-900/20 text-center py-12">
+        <Card className="border-dashed border-border/80 bg-muted/20 text-center py-12">
           <CardContent className="space-y-3">
-            <Sliders className="mx-auto h-10 w-10 text-zinc-600" />
+            <Sliders className="mx-auto h-10 w-10 text-muted-foreground" />
             <div className="space-y-1">
-              <h3 className="font-semibold text-white">No License Configurations Yet</h3>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              <h3 className="font-semibold text-foreground">No License Configurations Yet</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 Create reusable restriction templates (durations, max activations, grace periods, and custom JSON entitlements) for {activeProduct?.name || 'this product'}.
               </p>
             </div>
             {canManage && (
-              <Button onClick={openCreate} size="sm" variant="outline" className="border-zinc-700 text-zinc-300">
+              <Button onClick={openCreate} size="sm" variant="outline">
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add First Configuration
               </Button>
@@ -292,22 +294,23 @@ export function LicenseConfigurationPanel({
           {configurations.map((cfg) => (
             <Card
               key={cfg.id}
-              className={`border-zinc-800 bg-zinc-900/60 shadow-md ${
-                cfg.status === 'ARCHIVED' ? 'opacity-60' : ''
-              }`}
+              className={cn(
+                "border-border/70 bg-card shadow-xs hover:border-border transition-all duration-200",
+                cfg.status === 'ARCHIVED' && 'opacity-60'
+              )}
             >
               <CardHeader className="flex flex-row items-start justify-between pb-2">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-base font-bold text-white">
+                    <CardTitle className="text-base font-bold text-foreground">
                       {cfg.name}
                     </CardTitle>
-                    <Badge variant="outline" className="font-mono text-[10px] border-zinc-700 text-zinc-400">
+                    <Badge variant="outline" className="font-mono text-[10px] border-border/70 text-muted-foreground">
                       v{cfg.version}
                     </Badge>
                   </div>
                   {cfg.description && (
-                    <CardDescription className="text-xs text-zinc-400 line-clamp-1">
+                    <CardDescription className="text-xs text-muted-foreground line-clamp-1">
                       {cfg.description}
                     </CardDescription>
                   )}
@@ -316,8 +319,8 @@ export function LicenseConfigurationPanel({
                   variant={cfg.status === 'ACTIVE' ? 'default' : 'secondary'}
                   className={
                     cfg.status === 'ACTIVE'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]'
-                      : 'bg-zinc-800 text-zinc-400 text-[10px]'
+                      ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px]'
+                      : 'bg-muted text-muted-foreground text-[10px]'
                   }
                 >
                   {cfg.status}
@@ -327,11 +330,11 @@ export function LicenseConfigurationPanel({
               <CardContent className="space-y-4 pt-2">
                 {/* Parameter Pills */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2">
-                    <Clock className="h-4 w-4 text-blue-400" />
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                    <Clock className="h-4 w-4 text-primary" />
                     <div>
-                      <span className="text-[10px] text-zinc-500 block">Validity</span>
-                      <span className="font-medium text-zinc-200">
+                      <span className="text-[10px] text-muted-foreground block">Validity</span>
+                      <span className="font-medium text-foreground">
                         {cfg.durationDays === null || cfg.durationDays === undefined
                           ? 'Perpetual (Lifetime)'
                           : `${cfg.durationDays} Days`}
@@ -339,31 +342,31 @@ export function LicenseConfigurationPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2">
-                    <Laptop className="h-4 w-4 text-indigo-400" />
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                    <Laptop className="h-4 w-4 text-primary" />
                     <div>
-                      <span className="text-[10px] text-zinc-500 block">Activations</span>
-                      <span className="font-medium text-zinc-200">
+                      <span className="text-[10px] text-muted-foreground block">Activations</span>
+                      <span className="font-medium text-foreground">
                         {cfg.maximumActivations} Node{cfg.maximumActivations > 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2">
-                    <Users className="h-4 w-4 text-amber-400" />
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                    <Users className="h-4 w-4 text-primary" />
                     <div>
-                      <span className="text-[10px] text-zinc-500 block">Seats</span>
-                      <span className="font-medium text-zinc-200">
+                      <span className="text-[10px] text-muted-foreground block">Seats</span>
+                      <span className="font-medium text-foreground">
                         {cfg.seatLimit} Seat{cfg.seatLimit > 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2">
-                    <Layers className="h-4 w-4 text-emerald-400" />
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2.5">
+                    <Layers className="h-4 w-4 text-primary" />
                     <div>
-                      <span className="text-[10px] text-zinc-500 block">Grace / Heartbeat</span>
-                      <span className="font-medium text-zinc-200 font-mono text-[11px]">
+                      <span className="text-[10px] text-muted-foreground block">Grace / Heartbeat</span>
+                      <span className="font-medium text-foreground font-mono text-[11px]">
                         {Math.round(cfg.offlineGracePeriodSeconds / 3600)}h / {Math.round(cfg.revalidationIntervalSeconds / 60)}m
                       </span>
                     </div>
@@ -371,11 +374,11 @@ export function LicenseConfigurationPanel({
                 </div>
 
                 {/* Entitlements Summary & Actions */}
-                <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3">
+                <div className="flex items-center justify-between border-t border-border/60 pt-3">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 gap-1.5 text-xs text-zinc-400 hover:text-white"
+                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setViewingEntitlements(cfg.entitlements)}
                   >
                     <Code2 className="h-3.5 w-3.5" />
@@ -387,7 +390,7 @@ export function LicenseConfigurationPanel({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-zinc-400 hover:text-white"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => openEdit(cfg)}
                         title="Edit Configuration"
                       >
@@ -396,7 +399,7 @@ export function LicenseConfigurationPanel({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-zinc-400 hover:text-red-400"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => archiveMutation.mutate(cfg.id)}
                         disabled={archiveMutation.isPending}
                         title="Archive Configuration"
@@ -422,62 +425,60 @@ export function LicenseConfigurationPanel({
           }
         }}
       >
-        <DialogContent className="max-w-2xl border-zinc-800 bg-zinc-950 text-zinc-100 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
-              <Sliders className="h-5 w-5 text-blue-500" />
+            <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Sliders className="h-5 w-5 text-primary" />
               {editingConfig ? 'Edit License Configuration' : 'Create License Configuration Preset'}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               {editingConfig
                 ? 'Editing parameters increments the configuration version. Previously issued licenses remain immutable.'
                 : 'Define reusable default restrictions, node activations, seat limits, and structured permissions.'}
             </DialogDescription>
           </DialogHeader>
 
-          {formError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
+          <DialogBody className="space-y-4 py-4 text-sm">
+            {formError && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
-          <div className="space-y-4 py-2 text-sm">
             <div className="grid gap-2">
-              <Label htmlFor="cfg-name">Configuration Name *</Label>
+              <Label htmlFor="cfg-name" className="text-foreground">Configuration Name *</Label>
               <Input
                 id="cfg-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Standard Developer, Team Pro, On-Premise Core"
-                className="border-zinc-800 bg-zinc-900 text-white"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="cfg-desc">Description (Optional)</Label>
+              <Label htmlFor="cfg-desc" className="text-foreground">Description (Optional)</Label>
               <Input
                 id="cfg-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Internal notes or reference for this licensing preset"
-                className="border-zinc-800 bg-zinc-900 text-white"
               />
             </div>
 
             {/* Validity Duration */}
-            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3">
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="font-semibold text-white">License Duration & Expiry</Label>
+                <Label className="font-semibold text-foreground">License Duration & Expiry</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="perpetual-toggle"
                     checked={isPerpetual}
                     onChange={(e) => setIsPerpetual(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-0"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                   />
-                  <Label htmlFor="perpetual-toggle" className="text-xs text-zinc-300 cursor-pointer">
+                  <Label htmlFor="perpetual-toggle" className="text-xs text-muted-foreground cursor-pointer">
                     Perpetual / Lifetime (No Expiry)
                   </Label>
                 </div>
@@ -486,7 +487,7 @@ export function LicenseConfigurationPanel({
               {!isPerpetual ? (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="duration-days" className="text-xs text-zinc-400">Duration in Days</Label>
+                    <Label htmlFor="duration-days" className="text-xs text-muted-foreground">Duration in Days</Label>
                     <Input
                       id="duration-days"
                       type="number"
@@ -494,17 +495,17 @@ export function LicenseConfigurationPanel({
                       max={36500}
                       value={durationDays}
                       onChange={(e) => setDurationDays(Number(e.target.value))}
-                      className="border-zinc-800 bg-zinc-900 text-white mt-1"
+                      className="mt-1"
                     />
                   </div>
                   <div className="flex items-end">
-                    <span className="text-xs text-zinc-500 pb-2">
+                    <span className="text-xs text-muted-foreground pb-2">
                       = ~{(durationDays / 365).toFixed(1)} Year(s) / {Math.round(durationDays / 30)} Month(s)
                     </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-emerald-400">
+                <p className="text-xs text-emerald-500 font-medium">
                   License will be issued without an expiration timestamp.
                 </p>
               )}
@@ -513,35 +514,33 @@ export function LicenseConfigurationPanel({
             {/* Activations & Seats */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="max-act" className="text-xs">Max Node Activations</Label>
+                <Label htmlFor="max-act" className="text-xs text-foreground">Max Node Activations</Label>
                 <Input
                   id="max-act"
                   type="number"
                   min={1}
                   value={maxActivations}
                   onChange={(e) => setMaxActivations(Number(e.target.value))}
-                  className="border-zinc-800 bg-zinc-900 text-white"
                 />
-                <span className="text-[10px] text-zinc-500">Hardware machines allowed</span>
+                <span className="text-[10px] text-muted-foreground">Hardware machines allowed</span>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="seat-lim" className="text-xs">Seat Limit</Label>
+                <Label htmlFor="seat-lim" className="text-xs text-foreground">Seat Limit</Label>
                 <Input
                   id="seat-lim"
                   type="number"
                   min={1}
                   value={seatLimit}
                   onChange={(e) => setSeatLimit(Number(e.target.value))}
-                  className="border-zinc-800 bg-zinc-900 text-white"
                 />
-                <span className="text-[10px] text-zinc-500">User accounts allowed</span>
+                <span className="text-[10px] text-muted-foreground">User accounts allowed</span>
               </div>
             </div>
 
             {/* Grace Period & Revalidation */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="grace-period" className="text-xs">Offline Grace Period (Seconds)</Label>
+                <Label htmlFor="grace-period" className="text-xs text-foreground">Offline Grace Period (Seconds)</Label>
                 <Input
                   id="grace-period"
                   type="number"
@@ -549,15 +548,15 @@ export function LicenseConfigurationPanel({
                   max={2592000}
                   value={gracePeriodSec}
                   onChange={(e) => setGracePeriodSec(Number(e.target.value))}
-                  className="border-zinc-800 bg-zinc-900 text-white font-mono text-xs"
+                  className="font-mono text-xs"
                 />
-                <span className="text-[10px] text-zinc-500">
+                <span className="text-[10px] text-muted-foreground">
                   Default 25,200s (7 hours). Max 30 days.
                 </span>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="revalidation" className="text-xs">Revalidation Interval (Seconds)</Label>
+                <Label htmlFor="revalidation" className="text-xs text-foreground">Revalidation Interval (Seconds)</Label>
                 <Input
                   id="revalidation"
                   type="number"
@@ -565,9 +564,9 @@ export function LicenseConfigurationPanel({
                   max={86400}
                   value={revalidationSec}
                   onChange={(e) => setRevalidationSec(Number(e.target.value))}
-                  className="border-zinc-800 bg-zinc-900 text-white font-mono text-xs"
+                  className="font-mono text-xs"
                 />
-                <span className="text-[10px] text-zinc-500">
+                <span className="text-[10px] text-muted-foreground">
                   Default 300s (5 minutes). Max 24 hours.
                 </span>
               </div>
@@ -576,15 +575,15 @@ export function LicenseConfigurationPanel({
             {/* Entitlements JSON Editor */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <Code2 className="h-4 w-4 text-blue-400" />
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Code2 className="h-4 w-4 text-primary" />
                   Structured Entitlements (JSON)
                 </Label>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs text-blue-400 hover:text-blue-300 gap-1"
+                  className="h-7 text-xs text-primary hover:text-primary/80 gap-1"
                   onClick={() =>
                     setEntitlementsText(JSON.stringify(SAMPLE_ENTITLEMENTS, null, 2))
                   }
@@ -598,15 +597,15 @@ export function LicenseConfigurationPanel({
                 value={entitlementsText}
                 onChange={(e) => setEntitlementsText(e.target.value)}
                 placeholder='{\n  "features": { "pdf_export": true },\n  "limits": { "max_projects": 50 }\n}'
-                className="font-mono text-xs border-zinc-800 bg-zinc-900 text-zinc-200"
+                className="font-mono text-xs"
               />
-              <p className="text-[10px] text-zinc-500">
+              <p className="text-[10px] text-muted-foreground">
                 Supports typed boolean flags, numeric quotas, string configurations, and nested sections up to 3 levels deep.
               </p>
             </div>
-          </div>
+          </DialogBody>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter>
             <Button
               variant="outline"
               size="sm"
@@ -614,17 +613,15 @@ export function LicenseConfigurationPanel({
                 setIsCreateOpen(false)
                 setEditingConfig(null)
               }}
-              className="border-zinc-800 text-zinc-400"
             >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-500 text-white"
+              loading={createMutation.isPending || updateMutation.isPending}
             >
-              {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save Configuration'}
+              Save Configuration
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -635,25 +632,26 @@ export function LicenseConfigurationPanel({
         open={!!viewingEntitlements}
         onOpenChange={(open) => !open && setViewingEntitlements(null)}
       >
-        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 max-w-lg">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-white flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-blue-400" />
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Code2 className="h-4 w-4 text-primary" />
               Entitlements Payload
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-muted-foreground">
               Developer-defined restrictions, limits, and feature permissions delivered in signed license tokens.
             </DialogDescription>
           </DialogHeader>
-          <pre className="p-4 rounded-lg bg-zinc-900 text-emerald-400 font-mono text-xs overflow-x-auto max-h-80 border border-zinc-800">
-            {JSON.stringify(viewingEntitlements, null, 2)}
-          </pre>
+          <DialogBody>
+            <pre className="p-4 rounded-xl bg-muted/40 text-foreground font-mono text-xs overflow-x-auto max-h-80 border border-border/60 custom-scrollbar">
+              {JSON.stringify(viewingEntitlements, null, 2)}
+            </pre>
+          </DialogBody>
           <DialogFooter>
             <Button
               size="sm"
               variant="outline"
               onClick={() => setViewingEntitlements(null)}
-              className="border-zinc-800 text-zinc-300"
             >
               Close
             </Button>

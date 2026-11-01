@@ -1,38 +1,27 @@
-import { useEffect, useState } from 'react'
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import {
-  ShieldCheck,
-  Building2,
-  Users,
-  LogOut,
-  KeyRound,
-  CheckCircle2,
-  Package,
-  Layers,
-  ArrowRight,
-  Sliders,
-  UserCheck,
-  LayoutDashboard,
-} from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShieldCheck, X } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/services/apiClient'
+import { DashboardSidebar, type DashboardTab } from '@/components/dashboard/DashboardSidebar'
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { CommandMenu } from '@/components/dashboard/CommandMenu'
+import { OverviewView } from '@/components/dashboard/OverviewView'
+import { ProductsView } from '@/components/dashboard/ProductsView'
+import { DeveloperDocsView } from '@/components/dashboard/DeveloperDocsView'
+import { WorkspaceTeamView } from '@/components/dashboard/WorkspaceTeamView'
 import { LicenseConfigurationPanel } from '@/components/licensing/LicenseConfigurationPanel'
 import { CustomerDirectoryPanel } from '@/components/licensing/CustomerDirectoryPanel'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/card'
+import { IssuedLicensesPanel } from '@/components/licensing/IssuedLicensesPanel'
+import { DeviceActivationsPanel } from '@/components/licensing/DeviceActivationsPanel'
+import { type Customer, type LicenseConfiguration, type Product } from '@/types'
 
 export const Route = createFileRoute('/dashboard')({
   head: () => ({
     meta: [
-      { title: 'Workspace Dashboard | Rightful' },
+      { title: 'Workspace Control Center | Rightful' },
       { name: 'description', content: 'Rightful Multi-Tenant Licensing Workspace Dashboard.' },
     ],
   }),
@@ -41,31 +30,94 @@ export const Route = createFileRoute('/dashboard')({
 
 function DashboardPage() {
   const navigate = useNavigate()
-  const { session, profile, user, loading, signOut } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'configurations' | 'customers'>('overview')
+  const queryClient = useQueryClient()
+  const shouldReduceMotion = useReducedMotion()
+  const { session, profile, user, loading } = useAuth()
 
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('rightfull_sidebar_collapsed') === 'true'
+  })
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false)
+
+  // Redirect unauthenticated visitors
   useEffect(() => {
     if (!loading && !session) {
       navigate({ to: '/login' })
     }
   }, [session, loading, navigate])
 
+  // Global Cmd+K / Ctrl+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const defaultWs = profile?.defaultWorkspace
-  const memberships = profile?.memberships ?? []
   const displayName = profile?.fullName || user?.email?.split('@')[0] || 'Developer'
   const canManage = defaultWs?.role === 'OWNER' || defaultWs?.role === 'ADMIN'
 
-  const { data: products = [] } = useQuery({
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('rightfull_sidebar_collapsed', String(next))
+      } catch {}
+      return next
+    })
+  }
+
+  // 1. Fetch Products
+  const {
+    data: products = [],
+    isLoading: isLoadingProducts,
+    refetch: refetchProducts,
+  } = useQuery({
     queryKey: ['products', defaultWs?.id],
     queryFn: () => (defaultWs?.id ? apiClient.getProducts(defaultWs.id) : Promise.resolve([])),
     enabled: !!defaultWs?.id,
   })
 
+  // 2. Fetch Customers
+  const { data: customerPage } = useQuery({
+    queryKey: ['customers', defaultWs?.id],
+    queryFn: () => (defaultWs?.id ? apiClient.getCustomers(defaultWs.id, '', 'ACTIVE', 0, 50) : Promise.resolve(null)),
+    enabled: !!defaultWs?.id,
+  })
+  const customers: Customer[] = customerPage?.content || []
+
+  // 3. Fetch License Configurations (for first active product if available)
+  const firstProductId = products[0]?.id
+  const { data: configurations = [] } = useQuery({
+    queryKey: ['configurations', defaultWs?.id, firstProductId],
+    queryFn: () =>
+      defaultWs?.id && firstProductId
+        ? apiClient.getConfigurations(defaultWs.id, firstProductId)
+        : Promise.resolve([]),
+    enabled: !!defaultWs?.id && !!firstProductId,
+  })
+
+  // 4. Fetch System Health
+  const { data: health } = useQuery({
+    queryKey: ['system-health'],
+    queryFn: apiClient.getHealth,
+    staleTime: 60_000,
+  })
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-zinc-400">
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="text-sm font-medium">Verifying workspace session...</p>
         </div>
       </div>
@@ -77,309 +129,164 @@ function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-6 backdrop-blur">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600/10 text-blue-500 ring-1 ring-blue-500/20">
-              <ShieldCheck className="h-5 w-5 text-blue-500" />
+    <div className="flex min-h-screen w-full bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
+      {/* Desktop Collapsible Sidebar */}
+      <div className="hidden lg:block shrink-0">
+        <DashboardSidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
+          productCount={products.length}
+          customerCount={customers.length}
+        />
+      </div>
+
+      {/* Mobile Drawer Sidebar */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative z-50 flex h-full h-dvh w-72 flex-col bg-sidebar shadow-2xl">
+            <div className="absolute right-2 top-3 z-30">
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="rounded-lg p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                aria-label="Close sidebar"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <span className="font-bold tracking-tight text-white">Rightful</span>
-          </Link>
-
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center gap-1 border-l border-zinc-800 pl-6">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === 'overview'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('configurations')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === 'configurations'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-            >
-              <Sliders className="h-4 w-4" />
-              License Configurations
-            </button>
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === 'customers'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              Customers
-            </button>
-          </nav>
+            <DashboardSidebar
+              activeTab={activeTab}
+              onSelectTab={(tab) => {
+                setActiveTab(tab)
+                setMobileSidebarOpen(false)
+              }}
+              collapsed={false}
+              onToggleCollapse={() => {}}
+              productCount={products.length}
+              customerCount={customers.length}
+            />
+          </div>
         </div>
+      )}
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt={displayName}
-                className="h-8 w-8 rounded-full ring-1 ring-zinc-700 object-cover"
+      {/* Main Content Area */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Top Header */}
+        <DashboardHeader
+          activeTab={activeTab}
+          onOpenCommand={() => setCommandOpen(true)}
+          onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
+          systemHealth={health?.status === 'UP' ? 'UP' : 'UNKNOWN'}
+          workspaceName={defaultWs?.name}
+        />
+
+        {/* Viewport Content with Smooth Transitions */}
+        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-8">
+          <motion.div
+            key={activeTab}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-8"
+          >
+            {activeTab === 'overview' && (
+              <OverviewView
+                displayName={displayName}
+                workspaceName={defaultWs?.name}
+                products={products}
+                configurations={configurations}
+                customers={customers}
+                onNavigate={setActiveTab}
+                onOpenCreateProduct={() => {
+                  setActiveTab('products')
+                  setIsCreateProductOpen(true)
+                }}
               />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700">
-                <span className="text-xs font-bold uppercase">{displayName[0]}</span>
+            )}
+
+            {activeTab === 'products' && defaultWs?.id && (
+              <ProductsView
+                workspaceId={defaultWs.id}
+                products={products}
+                canManage={canManage}
+                isLoading={isLoadingProducts}
+                onRefresh={refetchProducts}
+                isCreateOpen={isCreateProductOpen}
+                setIsCreateOpen={setIsCreateProductOpen}
+              />
+            )}
+
+            {activeTab === 'configurations' && defaultWs?.id && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">
+                    Product License Configurations
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Define reusable licensing permission presets, seat limits, and developer-defined JSON entitlements.
+                  </p>
+                </div>
+                <LicenseConfigurationPanel
+                  workspaceId={defaultWs.id}
+                  products={products}
+                  canManage={canManage}
+                />
               </div>
             )}
-            <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs font-semibold text-white">{displayName}</span>
-              <span className="text-[10px] text-zinc-400">{user?.email}</span>
-            </div>
-          </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-zinc-400 hover:text-red-400 hover:bg-zinc-900"
-            onClick={async () => {
-              await signOut()
-              navigate({ to: '/login' })
-            }}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </Button>
-        </div>
-      </header>
+            {activeTab === 'licenses' && defaultWs?.id && (
+              <IssuedLicensesPanel
+                workspaceId={defaultWs.id}
+                products={products}
+              />
+            )}
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-6xl p-6 md:p-8 space-y-8">
-        {/* Mobile Tab Pills */}
-        <div className="flex md:hidden items-center gap-2 border-b border-zinc-800 pb-3">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-              activeTab === 'overview'
-                ? 'bg-zinc-800 text-white'
-                : 'text-zinc-400'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('configurations')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-              activeTab === 'configurations'
-                ? 'bg-zinc-800 text-white'
-                : 'text-zinc-400'
-            }`}
-          >
-            Configurations
-          </button>
-          <button
-            onClick={() => setActiveTab('customers')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-              activeTab === 'customers'
-                ? 'bg-zinc-800 text-white'
-                : 'text-zinc-400'
-            }`}
-          >
-            Customers
-          </button>
-        </div>
+            {activeTab === 'activations' && defaultWs?.id && (
+              <DeviceActivationsPanel
+                workspaceId={defaultWs.id}
+                products={products}
+              />
+            )}
 
-        {activeTab === 'configurations' && defaultWs?.id && (
-          <LicenseConfigurationPanel
-            workspaceId={defaultWs.id}
-            products={products}
-            canManage={canManage}
-          />
-        )}
-
-        {activeTab === 'customers' && defaultWs?.id && (
-          <CustomerDirectoryPanel
-            workspaceId={defaultWs.id}
-            canManage={canManage}
-          />
-        )}
-
-        {activeTab === 'overview' && (
-          <>
-            {/* Welcome Banner */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Welcome back, {displayName}
-            </h1>
-            <p className="text-sm text-zinc-400">
-              Your software licensing platform is active and ready to issue, validate, and manage client keys.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge
-              variant="outline"
-              className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400 px-3 py-1 text-xs"
-            >
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-              Backend Connected
-            </Badge>
-          </div>
-        </div>
-
-        {/* Primary Workspace Card */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card className="md:col-span-2 border-zinc-800 bg-zinc-900/60 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="space-y-1">
-                <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-500" />
-                  Primary Workspace
-                </CardTitle>
-                <CardDescription className="text-zinc-400">
-                  Default multi-tenant operational boundary
-                </CardDescription>
-              </div>
-              {defaultWs?.tier && (
-                <Badge variant="secondary" className="font-mono text-xs uppercase bg-zinc-800 text-zinc-300">
-                  {defaultWs.tier} Tier
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4 rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-4">
+            {activeTab === 'customers' && defaultWs?.id && (
+              <div className="space-y-6">
                 <div>
-                  <span className="text-xs text-zinc-500 font-medium">Workspace Name</span>
-                  <p className="text-sm font-semibold text-white mt-0.5">
-                    {defaultWs?.name || 'Personal Workspace'}
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">
+                    Customer Directory
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Maintain developer client organizations, email contacts, and custom external references.
                   </p>
                 </div>
-                <div>
-                  <span className="text-xs text-zinc-500 font-medium">Workspace Slug</span>
-                  <p className="text-sm font-mono text-blue-400 mt-0.5">
-                    {defaultWs?.slug || 'workspace'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs text-zinc-500 font-medium">Your Role</span>
-                  <div className="mt-0.5">
-                    <Badge variant="outline" className="border-blue-500/30 text-blue-400 font-mono text-xs">
-                      {defaultWs?.role || 'OWNER'}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-zinc-500 font-medium">Application User ID</span>
-                  <p className="text-xs font-mono text-zinc-400 mt-0.5 truncate" title={profile?.id}>
-                    {profile?.id || 'Provisioning...'}
-                  </p>
-                </div>
+                <CustomerDirectoryPanel
+                  workspaceId={defaultWs.id}
+                  canManage={canManage}
+                />
               </div>
+            )}
 
-              <div className="flex gap-3">
-                <Button
-                  className="gap-2 bg-blue-600 hover:bg-blue-500 text-white"
-                  size="sm"
-                  onClick={() => setActiveTab('configurations')}
-                >
-                  <Sliders className="h-4 w-4" />
-                  License Configurations
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-zinc-700 bg-transparent hover:bg-zinc-800 text-zinc-300"
-                  onClick={() => setActiveTab('customers')}
-                >
-                  <Users className="h-4 w-4 mr-1.5" />
-                  Manage Customers
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            {activeTab === 'developer' && defaultWs?.id && (
+              <DeveloperDocsView workspaceId={defaultWs.id} />
+            )}
 
-          {/* Memberships Card */}
-          <Card className="border-zinc-800 bg-zinc-900/60 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-indigo-400" />
-                Workspaces ({memberships.length})
-              </CardTitle>
-              <CardDescription className="text-zinc-400">
-                Organizations you have access to
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-3">
-              {memberships.map((m) => (
-                <div
-                  key={m.workspaceId}
-                  className="flex items-center justify-between rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3"
-                >
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-semibold text-white">{m.workspaceName}</p>
-                    <p className="text-[10px] font-mono text-zinc-500">{m.workspaceSlug}</p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] font-mono border-zinc-700 text-zinc-300">
-                    {m.role}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+            {(activeTab === 'team' || activeTab === 'settings') && (
+              <WorkspaceTeamView />
+            )}
+          </motion.div>
+        </main>
+      </div>
 
-        {/* Feature Roadmap Cards */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="group rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 transition-colors hover:border-zinc-700">
-            <div className="flex items-center justify-between">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-500/10 text-blue-400">
-                <KeyRound className="h-5 w-5" />
-              </span>
-              <ArrowRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-300" />
-            </div>
-            <h3 className="mt-4 font-semibold text-white">Cryptographic Licensing</h3>
-            <p className="mt-1 text-xs text-zinc-400">
-              Ed25519-signed offline verification and HMAC-SHA-256 non-reversible storage.
-            </p>
-          </div>
-
-          <div className="group rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 transition-colors hover:border-zinc-700">
-            <div className="flex items-center justify-between">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500/10 text-indigo-400">
-                <Layers className="h-5 w-5" />
-              </span>
-              <ArrowRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-300" />
-            </div>
-            <h3 className="mt-4 font-semibold text-white">Device Node-Locking</h3>
-            <p className="mt-1 text-xs text-zinc-400">
-              Seat enforcement, hardware fingerprint hashing, and heartbeat validation.
-            </p>
-          </div>
-
-          <div className="group rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 transition-colors hover:border-zinc-700">
-            <div className="flex items-center justify-between">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                <ShieldCheck className="h-5 w-5" />
-              </span>
-              <ArrowRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-0.5 group-hover:text-zinc-300" />
-            </div>
-            <h3 className="mt-4 font-semibold text-white">RBAC Security</h3>
-            <p className="mt-1 text-xs text-zinc-400">
-              Granular OWNER, ADMIN, MEMBER, and VIEWER roles across isolated tenants.
-            </p>
-          </div>
-        </div>
-          </>
-        )}
-      </main>
+      {/* Global Command Palette */}
+      <CommandMenu
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onNavigate={setActiveTab}
+      />
     </div>
   )
 }
-

@@ -1,0 +1,69 @@
+import React, { useEffect, useRef } from 'react'
+import { useInView, useMotionValue, useSpring, useReducedMotion } from 'motion/react'
+import { cn } from '@/lib/utils'
+
+interface NumberTickerProps {
+  value: number
+  direction?: 'up' | 'down'
+  delay?: number // in seconds
+  className?: string
+  decimalPlaces?: number
+}
+
+export function NumberTicker({
+  value,
+  direction = 'up',
+  delay = 0,
+  className,
+  decimalPlaces = 0,
+}: NumberTickerProps) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const shouldReduceMotion = useReducedMotion()
+  const motionValue = useMotionValue(direction === 'down' ? value : 0)
+  const springValue = useSpring(motionValue, {
+    damping: 30,
+    stiffness: 100,
+  })
+  const isInView = useInView(ref, { once: true, margin: '0px' })
+
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      if (ref.current) {
+        ref.current.textContent = Intl.NumberFormat('en-US', {
+          minimumFractionDigits: decimalPlaces,
+          maximumFractionDigits: decimalPlaces,
+        }).format(value)
+      }
+      return undefined
+    }
+
+    if (isInView) {
+      const timer = setTimeout(() => {
+        motionValue.set(direction === 'down' ? 0 : value)
+      }, delay * 1000)
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [motionValue, isInView, delay, value, direction, shouldReduceMotion, decimalPlaces])
+
+  useEffect(() => {
+    if (shouldReduceMotion) return
+    return springValue.on('change', (latest) => {
+      if (ref.current) {
+        ref.current.textContent = Intl.NumberFormat('en-US', {
+          minimumFractionDigits: decimalPlaces,
+          maximumFractionDigits: decimalPlaces,
+        }).format(Number(latest.toFixed(decimalPlaces)))
+      }
+    })
+  }, [springValue, decimalPlaces, shouldReduceMotion])
+
+  return (
+    <span
+      className={cn('inline-block tabular-nums tracking-normal', className)}
+      ref={ref}
+    >
+      {shouldReduceMotion ? value : direction === 'down' ? value : 0}
+    </span>
+  )
+}

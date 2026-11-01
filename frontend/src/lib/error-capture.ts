@@ -53,15 +53,16 @@ export function isAbortLike(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const err = value as Record<string, unknown>;
   if (
-    err.name === "AbortError" ||
-    err.code === "ECONNRESET" ||
-    err.code === "ERR_STREAM_PREMATURE_CLOSE"
+    err['name'] === "AbortError" ||
+    err['code'] === "ECONNRESET" ||
+    err['code'] === "ERR_STREAM_PREMATURE_CLOSE"
   ) {
     return true;
   }
+  const msg = err['message'];
   if (
-    typeof err.message === "string" &&
-    (err.message === "aborted" || err.message.includes("aborted"))
+    typeof msg === "string" &&
+    (msg === "aborted" || msg.includes("aborted"))
   ) {
     return true;
   }
